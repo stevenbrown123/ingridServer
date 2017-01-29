@@ -138,7 +138,7 @@ var complement = function() {
 	//Removes all edges (needed for animation), and brings back the new edges
 	var completeAnimation = function(matrix, size) {
 		while(GRAPH.edges.length > 0) {
-			GRAPHDRAWER.removeEdge(GRAPH.edges[0].getNode1(), GRAPH.edges[0].getNode2());
+			GRAPHDRAWER.removeEdge(GRAPH.edges[0].getId());
 		}
 		
 		for(var i = 0; i < size; i++) {
@@ -1119,8 +1119,9 @@ var graphDrawer = function() {
 		removeObjects(list);
 	}
 	//Removes a single edge (sync)
-	var removeEdge = function(sel1, sel2) {
-		var list = GRAPH.removeEdge(sel1, sel2);
+	var removeEdge = function(eId) {
+		var edge = GRAPH.findEdgeObject(eId);
+		var list = GRAPH.removeEdge(edge.getNode1(), edge.getNode2());
 		removeObjects(list);
 	}
 	//Removes everything (sync)
@@ -1843,21 +1844,8 @@ function deleteNode() {
 }
 function deleteEdge() {
 	var intersects = raycaster.intersectObjects( scene.children );
-	if(INTERSECTED != null && INTERSECTED.userData == "Node") {
-		if(SELECTED1 == null) {
-			SELECTED1 = INTERSECTED.id;
-		} else {
-			SELECTED2 = INTERSECTED.id;
-				
-			if(SELECTED1 == SELECTED2) {
-				SELECTED1 = SELECTED2 = null;
-			} else {							
-				GRAPHDRAWER.removeEdge(SELECTED1, SELECTED2);
-				SELECTED1 = SELECTED2 = null;
-			}
-		}
-	} else {
-		SELECTED1 = SELECTED2 = null;
+	if(INTERSECTED != null && INTERSECTED.userData == "Edge") {
+		GRAPHDRAWER.removeEdge(INTERSECTED.id);
 	}
 }
 function contractEdge() {
