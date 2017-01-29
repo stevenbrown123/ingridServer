@@ -11,7 +11,6 @@ var SELECTED2 = null;
 var SELECTED = null;
 var SELECTIONLIST = null;
 var SELECTEDEDGE = null;
-
 //Modes
 var mode;
 //Manipulation
@@ -19,21 +18,13 @@ var controls = null;
 var offset = new THREE.Vector3();
 var positions = null;
 var newPositions = null;
-//Edge Manipulation
-var cubeSelected = false;
-var cube1 = null;
-var cube2 = null;
-var dashedLine1 = null;
-var dashedLine2 = null;
-var dashedLine3 = null;
 var cancelConfirmation = 0;
-var cubesExist = false;
-var plane = null;
 //PDF
 const CANVAS_WIDTH_PORTRAIT = 190;
 const CANVAS_WIDTH_LANDSCAPE = 280;
 //Coloring
-const DEFAULT_COLOR = 0xf2f2f2;			
+const DEFAULT_COLOR = 0xf2f2f2;
+const DEFAULT_EDGE_COLOR = 0x000000;			
 //Animation
 const TIME_BT_FRAMES = 1000/60;
 //Shape Locations and Sizes
@@ -44,7 +35,7 @@ const PLANE_LAYER = EDGE_LAYER;
 const CUBE_LAYER = NODE_LAYER + .1;
 const PLANE_SIZE = 10000;
 const NODE_RADIUS = 15;
-const CUBE_WIDTH = 15;
+const CUBE_WIDTH = 5;
 const EDGE_WIDTH = 15;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -52,7 +43,7 @@ const EDGE_WIDTH = 15;
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
-///////////                              Complement                               //////////////////////
+///////////                              ~Complement~                             //////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*	Complement
 
@@ -168,7 +159,7 @@ var complement = function() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
-///////////                          Edge Contraction                             //////////////////////
+///////////                          ~Edge Contraction~                           //////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*	Edge Contraction
 
@@ -231,38 +222,22 @@ var edgeContraction = function() {
 		node.position.set(node.position.x + deltaX, node.position.y + deltaY, NODE_LAYER);
 		
 		SELECTEDLIST = GRAPH.findEdges(node.id);
+		var cube;
+		var edge;
 		
 		//Respositions the edges
 		for(var i = 0; i < SELECTEDLIST.length; i++) {
-			var curve;
-			var object = scene.getObjectById(SELECTEDLIST[i][0]);
-			var controlPoints = GRAPH.getControlPoints(object.id);
-			positions = object.geometry.vertices;//51 points
-			//0 17 34 51
-									
-			if(SELECTEDLIST[i][1] == 1) {
-				curve = new THREE.CubicBezierCurve3(
-					new THREE.Vector3( positions[0].x + deltaX, positions[0].y + deltaY, EDGE_LAYER ),
-					new THREE.Vector3( controlPoints[0].x + deltaX, controlPoints[0].y + deltaY, EDGE_LAYER ),
-					new THREE.Vector3( controlPoints[1].x, controlPoints[1].y, EDGE_LAYER ),
-					new THREE.Vector3( positions[50].x, positions[50].y, EDGE_LAYER )
-				);
-				GRAPH.setControlPoints(object.id, {x: controlPoints[0].x + deltaX, y: controlPoints[0].y + deltaY, z: EDGE_LAYER}, {x: controlPoints[1].x, y: controlPoints[1].y, z: EDGE_LAYER});
-			} else {
-				curve = new THREE.CubicBezierCurve3(
-					new THREE.Vector3( positions[0].x, positions[0].y , EDGE_LAYER ),
-					new THREE.Vector3( controlPoints[0].x, controlPoints[0].y , EDGE_LAYER ),
-					new THREE.Vector3( controlPoints[1].x + deltaX, controlPoints[1].y + deltaY , EDGE_LAYER ),
-					new THREE.Vector3( positions[50].x + deltaX, positions[50].y + deltaY, EDGE_LAYER )
-				);
-			GRAPH.setControlPoints(object.id, {x:controlPoints[0].x, y: controlPoints[0].y, z: EDGE_LAYER}, {x:controlPoints[1].x + deltaX, y: controlPoints[1].y + deltaY , z: EDGE_LAYER});
-			}
-			newPositions = curve.getPoints(50);								
-								
-			for(var j = 0; j < positions.length; j++) {
-				object.geometry.vertices[j] = newPositions[j];
-			}
-			object.geometry.verticesNeedUpdate = true;
+			cube = scene.getObjectById(SELECTEDLIST[i][0]);
+			edge = GRAPH.findEdgeObject(SELECTEDLIST[i][0]);
+					
+			edge.recalculateLength();
+			edge.recalculateRotation();
+			edge.recalculateMidPoint();
+					
+			cube.scale.x = edge.getLength();
+			cube.rotation.z = edge.getRotation();
+			cube.position.set(edge.getMidPoint().x, edge.getMidPoint().y, edge.getMidPoint().z);
+		
 		}
 	}
 
@@ -274,37 +249,20 @@ var edgeContraction = function() {
 		node.position.set(vector.x, vector.y, NODE_LAYER);
 		
 		SELECTEDLIST = GRAPH.findEdges(node.id);
+		var cube;
+		var edge;
 		
 		for(var i = 0; i < SELECTEDLIST.length; i++) {
-			var curve;
-			var object = scene.getObjectById(SELECTEDLIST[i][0]);
-			var controlPoints = GRAPH.getControlPoints(object.id);
-			positions = object.geometry.vertices;//51 points
-			//0 17 34 51
-									
-			if(SELECTEDLIST[i][1] == 1) {
-				curve = new THREE.CubicBezierCurve3(
-					new THREE.Vector3( positions[0].x + deltaX, positions[0].y + deltaY, EDGE_LAYER ),
-					new THREE.Vector3( controlPoints[0].x + deltaX, controlPoints[0].y + deltaY, EDGE_LAYER ),
-					new THREE.Vector3( controlPoints[1].x, controlPoints[1].y, EDGE_LAYER ),
-					new THREE.Vector3( positions[50].x, positions[50].y, EDGE_LAYER )
-				);
-				GRAPH.setControlPoints(object.id, {x: controlPoints[0].x + deltaX, y: controlPoints[0].y + deltaY, z: EDGE_LAYER}, {x: controlPoints[1].x, y: controlPoints[1].y, z: EDGE_LAYER});
-			} else {
-				curve = new THREE.CubicBezierCurve3(
-					new THREE.Vector3( positions[0].x, positions[0].y , EDGE_LAYER ),
-					new THREE.Vector3( controlPoints[0].x, controlPoints[0].y , EDGE_LAYER ),
-					new THREE.Vector3( controlPoints[1].x + deltaX, controlPoints[1].y + deltaY , EDGE_LAYER ),
-					new THREE.Vector3( positions[50].x + deltaX, positions[50].y + deltaY, EDGE_LAYER )
-				);
-			GRAPH.setControlPoints(object.id, {x: controlPoints[0].x, y: controlPoints[0].y, z: EDGE_LAYER}, {x:controlPoints[1].x + deltaX, y: controlPoints[1].y + deltaY , z: EDGE_LAYER});
-			}
-			newPositions = curve.getPoints(50);								
-								
-			for(var j = 0; j < positions.length; j++) {
-				object.geometry.vertices[j] = newPositions[j];
-			}
-			object.geometry.verticesNeedUpdate = true;
+			cube = scene.getObjectById(SELECTEDLIST[i][0]);
+			edge = GRAPH.findEdgeObject(SELECTEDLIST[i][0]);
+					
+			edge.recalculateLength();
+			edge.recalculateRotation();
+			edge.recalculateMidPoint();
+					
+			cube.scale.x = edge.getLength();
+			cube.rotation.z = edge.getRotation();
+			cube.position.set(edge.getMidPoint().x, edge.getMidPoint().y, edge.getMidPoint().z);
 		}
 	}
 	//Updates the actual graph
@@ -349,7 +307,7 @@ var edgeContraction = function() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
-///////////                   Eulerian Cycle                                      //////////////////////
+///////////                   ~Eulerian Cycle~                                    //////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*	Eulerian Cycle
 
@@ -672,7 +630,7 @@ var eulerianCycle = function() {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
-///////////                              Graph                                    //////////////////////
+///////////                              ~Graph~                                  //////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*	Graph
 	
@@ -754,9 +712,10 @@ var Graph = function() {
 		};
 	}
 	//Edge Object
-	var Edge = function(id, node1, node2, controlPoint1, controlPoint2) {
-		var endPoint1;
-		var endPoint2;
+	var Edge = function(id, node1, node2) {
+		var midPoint;
+		var length; 
+		var rotation
 		var color;
 		
 		var getId = function() {
@@ -768,56 +727,67 @@ var Graph = function() {
 		var getNode2 = function() {
 			return node2;
 		}
-		//(SUBJECT FOR DELETION FOR FINAL PRODUCT)
-		var getControlPoint1 = function() {
-			return controlPoint1;
+		var getMidPoint = function() {
+			return midPoint;
 		}
-		//(SUBJECT FOR DELETION FOR FINAL PRODUCT)
-		var getControlPoint2 = function() {
-			return controlPoint2;
+		var getLength = function() {
+			return length;
 		}
-		var getEndPoint1 = function() {
-			return endPoint1;
-		}
-		var getEndPoint2 = function() {
-			return endPoint1;
+		var getRotation = function() {
+			return rotation;
 		}
 		var getColor = function() {
 			return color;
 		}
 		
-		//(SUBJECT FOR DELETION FOR FINAL PRODUCT)
-		var setControlPoint1 = function(cp) {
-			controlPoint1 = cp;
+		var setMidPoint = function(mp) {
+			midPoint = mp;
 		}
-		//(SUBJECT FOR DELETION FOR FINAL PRODUCT)
-		var setControlPoint2 = function(cp) {
-			controlPoint2 = cp;
+		var setLength = function(l) {
+			length = l;
 		}
-		var setEndPoint1 = function(ep) {
-			endPoint1 = ep;
-		}
-		var setEndPoint2 = function(ep) {
-			endPoint2 = ep;
+		var setRotation = function(r) {
+			rotation = r
 		}
 		var setColor = function(c) {
 			color = c;
+		}
+		
+		var recalculateLength = function() {
+			var l = scene.getObjectById(node1).position.clone();
+			l.sub(scene.getObjectById(node2).position);
+			l = Math.sqrt(Math.pow(l.x, 2) + Math.pow(l.y, 2));
+			length = l;
+		}
+		var recalculateRotation = function() {
+			var r = scene.getObjectById(node1).position.clone();
+			r.sub(scene.getObjectById(node2).position);
+			r.normalize();
+			rotation = Math.atan(r.y / r.x);
+		}
+		var recalculateMidPoint = function() {
+			var p = scene.getObjectById(node1).position.clone();
+			p.add(scene.getObjectById(node2).position);
+			p.divideScalar(2);
+			p.z = EDGE_LAYER;
+			midPoint = p;
 		}
 		
 		return {
 			getId: getId,
 			getNode1: getNode1,
 			getNode2: getNode2,
-			getControlPoint1: getControlPoint1, //(SUBJECT FOR DELETION FOR FINAL PRODUCT)
-			getControlPoint2: getControlPoint2, //(SUBJECT FOR DELETION FOR FINAL PRODUCT)
-			getEndPoint1: getEndPoint1,
-			getEndPoint2: getEndPoint2,
 			getColor: getColor,
-			setControlPoint1: setControlPoint1, //(SUBJECT FOR DELETION FOR FINAL PRODUCT)
-			setControlPoint2: setControlPoint2, //(SUBJECT FOR DELETION FOR FINAL PRODUCT)
-			setEndPoint1: setEndPoint1,
-			setEndPoint2: setEndPoint2,
-			setColor, setColor
+			getRotation: getRotation,
+			getLength: getLength,
+			getMidPoint: getMidPoint,
+			setMidPoint: setMidPoint,
+			setLength: setLength,
+			setColor: setColor,
+			setRotation: setRotation,
+			recalculateLength: recalculateLength,
+			recalculateRotation: recalculateRotation,
+			recalculateMidPoint: recalculateMidPoint
 		}
 	}
 	//Camera Object
@@ -881,8 +851,7 @@ var Graph = function() {
 		};
 		
 		//Requires the node pair be unique, unique object id, rejects self loops
-		//(SUBJECT FOR MODIFICATION IF CONTROL POINTS ARE TO BE DELETED)
-		var addEdge = function(id, n1, n2, cp1, cp2) {
+		var addEdge = function(id, n1, n2) {
 			for(var i = 0; i < edges.length; i++) {
 				if(edges[i].getNode1() == n1 && 
 				edges[i].getNode2() == n2 ||
@@ -896,7 +865,7 @@ var Graph = function() {
 				return false;
 			}
 			
-			edges.push(new Edge(id, n1, n2, cp1, cp2));	
+			edges.push(new Edge(id, n1, n2));	
 			findNode(n1).incrementDegree();
 			findNode(n2).incrementDegree();
 					
@@ -980,6 +949,18 @@ var Graph = function() {
 			return edge;
 		};
 		
+		//Same as findEdge, but returns the Edge object
+		var findEdgeObject = function(eId) {
+			var edge = null;
+			for(var i = 0; i < edges.length; i++) {
+				if(edges[i].getId() == eId) {
+					edge = edges[i];
+					break;
+				}
+			}
+			return edge;
+		}
+		
 		//Finds all edges for a node. Required object id.
 		var findEdges = function(n, both=false) {
 			var edgesFound = [];
@@ -1003,25 +984,6 @@ var Graph = function() {
 			return edgesFound;
 		};
 		
-		//(SUBJECT FOR DELETION FOR FINAL PRODUCT)
-		var getControlPoints = function(e) {
-			for(var i = 0; i < edges.length; i++) {
-				if(edges[i].getId() == e) {
-					return [edges[i].getControlPoint1(), edges[i].getControlPoint2()];
-				}
-			}
-		};
-		//(SUBJECT FOR DELETION FOR FINAL PRODUCT)
-		var setControlPoints = function(e, v1, v2) {
-			for(var i = 0; i < edges.length; i++) {
-				if(edges[i].getId() == e) {
-					edges[i].setControlPoint1({x: v1.x, y: v1.y, z: v1.z});
-					edges[i].setControlPoint2({x: v2.x, y: v2.y, z: v2.z});
-					return;
-				}
-			}
-		};
-		
 		return {
 			nodes: nodes,
 			edges: edges,
@@ -1034,8 +996,7 @@ var Graph = function() {
 			findNode: findNode,
 			findEdge: findEdge,
 			findEdges: findEdges,
-			getControlPoints: getControlPoints,
-			setControlPoints: setControlPoints
+			findEdgeObject: findEdgeObject
 		};
 	}
 	
@@ -1046,7 +1007,7 @@ var Graph = function() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
-///////////                          Graph Drawer                                 //////////////////////
+///////////                          ~Graph Drawer~                               //////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*	Graph Drawer
 
@@ -1103,68 +1064,53 @@ var graphDrawer = function() {
 			},					 
 			complement		<--For the Complement function
 		}
-	*/		
-		var curve;
-
-		//Everything else
-		if(typeof options.selections !== "undefined") {
-			curve = new THREE.CubicBezierCurve3(
-				new THREE.Vector3( options.selections[0].position.x, options.selections[0].position.y, EDGE_LAYER ),
-				new THREE.Vector3( options.selections[0].position.x, options.selections[0].position.y, EDGE_LAYER ),
-				new THREE.Vector3( options.selections[1].position.x, options.selections[1].position.y, EDGE_LAYER),
-				new THREE.Vector3( options.selections[1].position.x, options.selections[1].position.y, EDGE_LAYER)
-			);
-		} 
-		//Loading
-		else {
-			curve = new THREE.CubicBezierCurve3(
-				new THREE.Vector3( options.loading.load.endPoint1.x, options.loading.load.endPoint1.y, options.loading.load.endPoint1.z ),
-				new THREE.Vector3( options.loading.load.controlPoint1.x, options.loading.load.controlPoint1.y, options.loading.load.controlPoint1.z ),
-				new THREE.Vector3( options.loading.load.controlPoint2.x, options.loading.load.controlPoint2.y, options.loading.load.controlPoint2.z ),
-				new THREE.Vector3( options.loading.load.endPoint2.x, options.loading.load.endPoint2.y, options.loading.load.endPoint2.z)
-			);
-		}
+	*/			
+		var geometry = new THREE.BoxBufferGeometry( 1, CUBE_WIDTH, 1 );			
 		
 		var material;
 		
 		//Everything else
 		if(typeof options.selections !== "undefined" && typeof options.complement === "undefined" ||
 			typeof options.loading !== "undefined") {
-			material = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true });
+			material = new THREE.MeshLambertMaterial({ color: DEFAULT_EDGE_COLOR, transparent: true });
 		}
 		//Used as part of the beginning of the Complement animation
 		else {
-			material = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0 });
-		}
+			material = new THREE.MeshLambertMaterial({ color: DEFAULT_EDGE_COLOR, transparent: true, opacity: 0 });
+		}	
 		
-		//Edge object
-		var geometry = new THREE.Geometry();
-		geometry.vertices = curve.getPoints(50);
-		var line = new THREE.Line( geometry, material );
-		line.userData = "Edge";
+		//Edge Object
+		var cube = new THREE.Mesh( geometry, material );
+		cube.userData = "Edge";
 		
 		var bool = false;//Assume edge is invalid
 		
 		//For everything else, validates edge, or not
 		if(typeof options.selections != "undefined") {
-			bool = GRAPH.addEdge(line.id, options.selections[0].id, options.selections[1].id, options.selections[0].position,  options.selections[1].position );
+			bool = GRAPH.addEdge(cube.id, options.selections[0].id, options.selections[1].id);
 		} 
 		//Loading
 		else {
 			var n1 = nodeMap[options.loading.load.node1];
 			var n2 = nodeMap[options.loading.load.node2];
 		
-			bool = GRAPH.addEdge(line.id, n1, n2, options.loading.load.controlPoint1, options.loading.load.controlPoint2);
+			bool = GRAPH.addEdge(cube.id, n1, n2);
 		}
 		
+		
+		
 		//Check edge validity before creating object
-		//Everything else
-		if(typeof options.loading == "undefined" && bool) {
-			scene.add( line );
-		}
-		//Loading
-		else if(typeof options.loading != "undefined" && bool) {
-			scene.add( line );
+		if(bool) {
+			var edge = GRAPH.findEdgeObject(cube.id);
+			edge.recalculateLength();
+			edge.recalculateRotation();
+			edge.recalculateMidPoint();
+			
+			cube.scale.x = edge.getLength();
+			cube.rotation.z = edge.getRotation();
+			cube.position.set(edge.getMidPoint().x, edge.getMidPoint().y, edge.getMidPoint().z);
+			
+			scene.add( cube );
 		}
 	}
 	//Remvoes the node and edges attached to it (sync)
@@ -1244,7 +1190,7 @@ var graphDrawer = function() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
-///////////                           Graph Parser                                //////////////////////
+///////////                           ~Graph Parser~                              //////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 /*	graphParser INCOMPLETE
 
@@ -1586,13 +1532,7 @@ $(document).ready(function(){
 			obj = scene.getObjectById(GRAPH.nodes[i].getId());
 			GRAPH.nodes[i].setPosition(obj.position);
 			GRAPH.nodes[i].setColor(obj.material.color.getHex());
-		}		
-
-		for(var i = 0; i < GRAPH.edges.length; i++) {
-			obj = scene.getObjectById(GRAPH.edges[i].getId());
-			GRAPH.edges[i].setEndPoint1(obj.geometry.vertices[0]);
-			GRAPH.edges[i].setEndPoint2(obj.geometry.vertices[50]);
-		}
+		}	
 		
 		GRAPH.camera.setPosition(camera.position);
 		GRAPH.camera.setZoom(camera.zoom);
@@ -1615,12 +1555,7 @@ $(document).ready(function(){
 			obj.edges.push({id: GRAPH.edges[i].getId(),
 				node1: GRAPH.edges[i].getNode1(),
 				node2: GRAPH.edges[i].getNode2(),
-				controlPoint1: new THREE.Vector3(Math.round(GRAPH.edges[i].getControlPoint1().x * 100) / 100,
-					Math.round(GRAPH.edges[i].getControlPoint1().y * 100) / 100,
-					Math.round(GRAPH.edges[i].getControlPoint1().z * 100) / 100),
-				controlPoint2: new THREE.Vector3(Math.round(GRAPH.edges[i].getControlPoint2().x * 100) / 100,
-					Math.round(GRAPH.edges[i].getControlPoint2().y * 100) / 100,
-					Math.round(GRAPH.edges[i].getControlPoint2().z * 100) / 100)})
+				color: GRAPH.nodes[i].getColor()});
 		}
 		
 		obj.camera = {};
@@ -1692,9 +1627,6 @@ $(document).ready(function(){
 		else if(mode == "deleteEdge") {
 			deleteEdge();
 		}
-		else if(mode == "moveEdge") {
-			moveEdge();
-		}
 		else if(mode == "contractionMode") {
 			contractEdge();
 		}
@@ -1750,113 +1682,29 @@ $(document).ready(function(){
 				SELECTEDLIST = GRAPH.findEdges(SELECTED1.id);
 			}
 		}
-		else if(mode == "moveEdge") {
-			var intersects = raycaster.intersectObjects( scene.children );
-			if(cubesExist && (INTERSECTED == cube1 || INTERSECTED == cube2)) {
-				SELECTED = INTERSECTED;
-				cubeSelected = true;
-			}
-		}
 	});
 
 	$("#renderer").mousemove(function(){
 		if(mode == "moveNode") {
 			if(SELECTED1) {
 				var intersects = raycaster.intersectObject( plane );
-				var deltaX = SELECTED1.position.x;
-				var deltaY = SELECTED1.position.y;
 				SELECTED1.position.set(intersects[0].point.x, intersects[0].point.y, NODE_LAYER);
-				var deltaX = intersects[0].point.x - deltaX;
-				var deltaY = intersects[0].point.y - deltaY;
+				
+				var object;
+				var edge;
 				
 				for(var i = 0; i < SELECTEDLIST.length; i++) {
-					var curve;
-					var object = scene.getObjectById(SELECTEDLIST[i][0]);
-					var controlPoints = GRAPH.getControlPoints(object.id);
-					positions = object.geometry.vertices;//51 points
-					//0 17 34 51
-						
-					if(SELECTEDLIST[i][1] == 1) {
-						curve = new THREE.CubicBezierCurve3(
-							new THREE.Vector3( intersects[0].point.x, intersects[0].point.y, EDGE_LAYER ),
-							new THREE.Vector3( controlPoints[0].x + deltaX, controlPoints[0].y + deltaY, EDGE_LAYER ),
-							new THREE.Vector3( controlPoints[1].x, controlPoints[1].y, EDGE_LAYER ),
-							new THREE.Vector3( positions[50].x, positions[50].y, EDGE_LAYER )
-						);
-						GRAPH.setControlPoints(object.id, {x: controlPoints[0].x + deltaX, y: controlPoints[0].y + deltaY, z: EDGE_LAYER}, {x: controlPoints[1].x, y: controlPoints[1].y, z: EDGE_LAYER});
-					} else {
-						curve = new THREE.CubicBezierCurve3(
-							new THREE.Vector3( positions[0].x, positions[0].y , EDGE_LAYER ),
-							new THREE.Vector3( controlPoints[0].x, controlPoints[0].y , EDGE_LAYER ),
-							new THREE.Vector3( controlPoints[1].x + deltaX, controlPoints[1].y + deltaY , EDGE_LAYER ),
-							new THREE.Vector3( intersects[0].point.x, intersects[0].point.y, EDGE_LAYER )
-						);
-					GRAPH.setControlPoints(object.id, {x: controlPoints[0].x, y: controlPoints[0].y, z: EDGE_LAYER}, {x: controlPoints[1].x + deltaX, y: controlPoints[1].y + deltaY , z: EDGE_LAYER});
-					}
-					newPositions = curve.getPoints(50);								
-						
-					for(var j = 0; j < positions.length; j++) {
-						object.geometry.vertices[j] = newPositions[j];
-					}
-					object.geometry.verticesNeedUpdate = true;
+					object = scene.getObjectById(SELECTEDLIST[i][0]);
+					edge = GRAPH.findEdgeObject(SELECTEDLIST[i][0]);
+					
+					edge.recalculateLength();
+					edge.recalculateRotation();
+					edge.recalculateMidPoint();
+					
+					object.position.set(edge.getMidPoint().x, edge.getMidPoint().y, edge.getMidPoint().z);
+					object.scale.x = edge.getLength();
+					object.rotation.z = edge.getRotation();
 				}
-			}
-		}
-		else if(mode == "moveEdge") {
-			if(SELECTED && (SELECTED == cube1 || SELECTED == cube2)) {
-				var intersects = raycaster.intersectObject( plane );
-				SELECTED.position.set(intersects[0].point.x, intersects[0].point.y, CUBE_LAYER);
-				var curve;
-				var object = scene.getObjectById(SELECTEDEDGE);
-				var controlPoints = GRAPH.getControlPoints(SELECTEDEDGE);
-				positions = object.geometry.vertices;
-				curve = new THREE.CubicBezierCurve3(
-					new THREE.Vector3( positions[0].x, positions[0].y, EDGE_LAYER ),
-					new THREE.Vector3( cube1.position.x, cube1.position.y, EDGE_LAYER ),
-					new THREE.Vector3( cube2.position.x, cube2.position.y, EDGE_LAYER ),
-					new THREE.Vector3( positions[50].x, positions[50].y, EDGE_LAYER )
-				);
-				GRAPH.setControlPoints(SELECTEDEDGE, {x: cube1.position.x, y: cube1.position.y, z: EDGE_LAYER}, {x: cube2.position.x, y: cube2.position.y, z: EDGE_LAYER});
-				newPositions = curve.getPoints(50);
-				
-				for(var j = 0; j < positions.length; j++) {
-					object.geometry.vertices[j] = newPositions[j];
-				}
-					
-				var geometry1 = new THREE.Geometry();
-				geometry1.vertices.push(
-					new THREE.Vector3( positions[0].x, positions[0].y, EDGE_LAYER ),
-					new THREE.Vector3( cube1.position.x, cube1.position.y, EDGE_LAYER )
-				);
-				dashedLine1.geometry.vertices[0] = geometry1.vertices[0];
-				dashedLine1.geometry.vertices[1] = geometry1.vertices[1];
-				dashedLine1.geometry.computeLineDistances();
-					
-				var geometry2 = new THREE.Geometry();
-				geometry2.vertices.push(
-					new THREE.Vector3( cube1.position.x, cube1.position.y, EDGE_LAYER ),
-					new THREE.Vector3( cube2.position.x, cube2.position.y, EDGE_LAYER )
-				);
-				dashedLine2.geometry.vertices[0] = geometry2.vertices[0];
-				dashedLine2.geometry.vertices[1] = geometry2.vertices[1];
-				dashedLine2.geometry.computeLineDistances();
-					
-				var geometry3 = new THREE.Geometry();
-				geometry3.vertices.push(
-					new THREE.Vector3( cube2.position.x, cube2.position.y, EDGE_LAYER ),
-					new THREE.Vector3( positions[50].x, positions[50].y, EDGE_LAYER )
-				);
-				dashedLine3.geometry.vertices[0] = geometry3.vertices[0];
-				dashedLine3.geometry.vertices[1] = geometry3.vertices[1];
-				dashedLine3.geometry.computeLineDistances();
-					
-				object.geometry.verticesNeedUpdate = true;
-				dashedLine1.geometry.verticesNeedUpdate = true;
-				dashedLine1.geometry.lineDistancesNeedUpdate = true;
-				dashedLine2.geometry.verticesNeedUpdate = true;
-				dashedLine2.geometry.lineDistancesNeedUpdate = true;
-				dashedLine3.geometry.verticesNeedUpdate = true;
-				dashedLine3.geometry.lineDistancesNeedUpdate = true;
 			}
 		}
 	});
@@ -1868,12 +1716,6 @@ $(document).ready(function(){
 				SELECTED1 = null;
 				SELECTEDLIST = null;
 			}
-			else if(mode == "moveEdge") {
-				if(cubesExist && (SELECTED == cube1 || SELECTED == cube2)) {
-					controls.enable = true;
-					SELECTED = null;
-				}
-			}
 				break;
 			case 3:
 				plane.position.set(camera.position.x, camera.position.y, PLANE_LAYER);
@@ -1881,10 +1723,6 @@ $(document).ready(function(){
 		}
 		
 	});
-	
-	
-		
-	
 });
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2022,112 +1860,6 @@ function deleteEdge() {
 		SELECTED1 = SELECTED2 = null;
 	}
 }
-function moveEdge() {
-	if(!cubeSelected) {
-		var intersects = raycaster.intersectObjects( scene.children );
-		
-		if(INTERSECTED != null && INTERSECTED.userData == "Node") {
-			if(SELECTED1 == null) {
-				SELECTED1 = INTERSECTED.id;
-			} else{
-				SELECTED2 = INTERSECTED.id;
-				
-				if(SELECTED1 == SELECTED2) {
-					SELECTED1 = SELECTED2 = null;
-				} else {						
-					SELECTEDEDGE = GRAPH.findEdge(SELECTED1, SELECTED2);
-						
-					if(SELECTEDEDGE != null) {
-						
-						if(cubesExist) {
-							cancelConfirmation = 0;
-							scene.remove(cube1);
-							scene.remove(cube2);
-							scene.remove(dashedLine1);
-							scene.remove(dashedLine2);
-							scene.remove(dashedLine3);
-						}
-					
-						var cps = GRAPH.getControlPoints(SELECTEDEDGE);
-						var object = scene.getObjectById(SELECTEDEDGE);
-						var vertices = object.geometry.vertices;
-							
-						var geometry = new THREE.BoxBufferGeometry(CUBE_WIDTH, CUBE_WIDTH, 0.1);
-						var material1 = new THREE.MeshLambertMaterial({color: 0xff0000});
-						var material2 = new THREE.MeshLambertMaterial({color: 0xff0000});
-						cube1 = new THREE.Mesh(geometry, material1);
-						cube2 = new THREE.Mesh(geometry, material2);
-						cube1.position.set(cps[0].x, cps[0].y, CUBE_LAYER);
-						cube2.position.set(cps[1].x, cps[1].y, CUBE_LAYER);
-						cube1.userData = "Manip";
-						cube2.userData = "Manip";
-							
-						var materialLine1 = new THREE.LineDashedMaterial( {
-							color: 0x000000,
-							lineWidth: 1,
-							scale: 1,
-							dashSize: 1,
-							gapSize: 1,
-						} );
-						var materialLine2 = new THREE.LineDashedMaterial( {
-							color: 0x000000,
-							lineWidth: 1,
-							scale: 1,
-							dashSize: 1,
-							gapSize: 1,
-						} );
-						var materialLine3 = new THREE.LineDashedMaterial( {
-							color: 0x000000,
-							lineWidth: 1,
-							scale: 1,
-							dashSize: 1,
-							gapSize: 1,
-						} );
-							
-						var geometry1 = new THREE.Geometry();
-						geometry1.vertices.push(
-							new THREE.Vector3( vertices[0].x, vertices[0].y, vertices[0].z ),
-							new THREE.Vector3( cube1.position.x, cube1.position.y, cube1.position.z )
-						);
-						geometry1.computeLineDistances();
-						var geometry2 = new THREE.Geometry();
-						geometry2.vertices.push(
-							new THREE.Vector3( cube1.position.x, cube1.position.y, cube1.position.z ),
-							new THREE.Vector3( cube2.position.x, cube2.position.y, cube2.position.z )
-						);
-						geometry2.computeLineDistances();
-						var geometry3 = new THREE.Geometry();
-						geometry3.vertices.push(
-							new THREE.Vector3( cube2.position.x, cube2.position.y, cube2.position.z ),
-							new THREE.Vector3( vertices[50].x, vertices[50].y, vertices[50].z )
-						);
-						geometry3.computeLineDistances();
-							
-						dashedLine1 = new THREE.Line(geometry1, materialLine1);
-						dashedLine2 = new THREE.Line(geometry2, materialLine2);
-						dashedLine3 = new THREE.Line(geometry3, materialLine3);
-						
-						scene.add(cube1);
-						scene.add(cube2);
-						scene.add(dashedLine1);
-						scene.add(dashedLine2);
-						scene.add(dashedLine3);
-						cubesExist = true;
-					}
-					SELECTED1 = SELECTED2 = null;
-				}
-			}
-		} else if (INTERSECTED != null && INTERSECTED.userData == "Manip") {
-		} else {
-			SELECTED1 = SELECTED2 = null;
-			if(cubesExist) {
-				cancelConfirmation++;
-			}
-		}
-	} else {
-		cubeSelected = false;
-	}
-}
 function contractEdge() {
 	var intersects = raycaster.intersectObjects( scene.children );
 	if(INTERSECTED != null && INTERSECTED.userData == "Node") {
@@ -2220,13 +1952,6 @@ function moveNodeMode() {
 	resetSelection();
 	cleanUpAnimation();
 }
-function moveEdgeMode() {
-	hintBox("Left click on the two connected nodes to select the edge that you would like to manipulate.<br/>Drag the red squares that appear to manipulate the edge.");
-	mode = "moveEdge";
-	resetSelection();
-	cleanUpAnimation();
-	cleanUp()
-}
 function contractionMode() {
 	hintBox("Select the two nodes to which the edge connects to contract it.");
 	mode = "contractionMode";
@@ -2272,16 +1997,6 @@ function eulerianCycleMode() {
 //Resets selections
 function resetSelection() {
 	SELECTED1 = SELECTED2 = SELECTIONLIST = SELECTEDEDGE = null;
-
-	if(cubesExist) {
-		scene.remove(cube1);
-		scene.remove(cube2);
-		scene.remove(dashedLine1);
-		scene.remove(dashedLine2);
-		scene.remove(dashedLine3);
-		cancelConfirmation = 0;
-		cubesExist = false;
-	}
 }
 //All functions that clean up animations,input forms, etc. for sepcific functions should go here. 
 function cleanUpAnimation() {
@@ -2300,16 +2015,6 @@ function cleanUp() {
 /////////////////////////// here, detecting where the mouse is to check for detection.                                                /////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 function animate() {
-	if(cancelConfirmation == 2) {
-		scene.remove(cube1);
-		scene.remove(cube2);
-		scene.remove(dashedLine1);
-		scene.remove(dashedLine2);
-		scene.remove(dashedLine3);
-		cancelConfirmation = 0;
-		cubesExist = false;
-	}
-
 	controls.update();
 		
 	requestAnimationFrame(animate); 
