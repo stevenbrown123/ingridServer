@@ -11,6 +11,7 @@ var SELECTED2 = null;
 var SELECTED = null;
 var SELECTIONLIST = null;
 var SELECTEDEDGE = null;
+
 //Modes
 var mode;
 //Manipulation
