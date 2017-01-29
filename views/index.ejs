@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+
+<html>
+<header>
+    <title> INGRID </title>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+          integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
+            integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa"
+            crossorigin="anonymous"></script>
+</header>
+
+<body>
+
+<% include ./partials/header %>
+
+<p class="h1 text-center">
+    <bold>Welcome to INGRID<sup>2</sup></bold>
+    <small class="text-muted"> | the perfect graph theorist</small>
+</p>
+
+<!-- This is the section for the Invariants -->
+<form id="invarForm" class="form-horizontal" action="/" method="post">
+    <!-- The container containing all of the invariants -->
+
+    <div class="container">
+        <!-- The left column of the page with half of the numerical valued invariants -->
+        <div id="firstColumn" class="container-fluid col-md-4">
+        </div>
+
+        <!-- The middle column of the page with half of the invariants -->
+        <div id="secondColumn" class="container-fluid col-md-4">
+        </div>
+
+        <!-- the right column of invariants, all boolean valued -->
+        <div id="thirdColumn" class="container col-sm-4">
+        </div>
+    </div>
+</form>
+    <!-- Buttons for calculate, add invariant and save work -->
+    <div class="row">
+        <div class="container col-md-6 col-md-offset-6">
+            <div class="row">
+
+                <div class="container col-sm-2 ">
+                    <button type="button" id="calculate" class="btn btn-primary">Calculate</button>
+                </div>
+                <div class="container col-sm-2" >
+                    <!-- Trigger the modal with a button -->
+                    <button type="button" class="btn btn-primary" id="modalButton">Add Invariant</button>
+                    <!-- Modal -->
+                    <div class="modal fade" id="myModal" role="dialog">
+                        <div class="modal-dialog">
+                            <!-- Modal content-->
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <!-- Change the header text, leave the exit button -->
+                                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                                    <h4 class="modal-title">Add a new invariant</h4>
+                                </div>
+                                <div class="modal-body">
+                                    <!-- Add the labels and tags for the invariant addition stuff here -->
+                                    <form class="horizontal-form">
+                                        <div class="row">
+                                            <div class="form-group">
+                                                <label for="invarName" class="col-sm-3 control-label">Invariant Name</label>
+                                                <div class="col-sm-9">
+                                                    <input class="form-control" id="invarName" value="" placeholder="Invariant Name">
+                                                </div>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="varName" class="col-sm-3 control-label">Variable Name</label>
+                                                <div class="col-sm-9">
+                                                    <input class="form-control" id="varName" value="" placeholder="Variable Name">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="radio-button-group" class="col-sm-3 control-label">Invariant
+                                                Type</label>
+                                            <div class="radio-button-group col-sm-9" id="radios">
+                                                <div class="radio">
+                                                    <label>
+                                                        <input type="radio" name="invarType" value="Real" class="toggle"> Real Valued
+                                                    </label>
+                                                    <label>
+                                                        <input type="radio" name="invarType" value="Integer" class="toggle" checked> Integer Valued
+                                                    </label>
+                                                    <label>
+                                                        <input type="radio" name="invarType" value="Boolean" class="toggle"> Boolean
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                                <div class="modal-footer">
+                                    <!-- this is where you add the create and cancel buttons -->
+                                    <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                                    <button type="button" class="btn btn-primary" data-dismiss="modal" id="addInvar">
+                                        Submit
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="container col-sm-2 " style="margin-left:3%;">
+                    <form method="get" action="">
+                        <button id="save" type="button" class="btn btn-primary" style="">Save Work</button>
+                    </form>
+                </div>
+                <div class="container col-sm-4">
+                    <input type="hidden" class="form-control" id="hiddenField" value="">
+                </div>
+            </div>
+        </div>
+    </div>
+<br>
+
+<!-- Section to add theorems  -->
+<form class="form-group">
+    <div class="btn-group btn-group-justified dropup">
+        <!-- Dropdown with invariants -->
+        <div class="btn-group" role="group">
+            <button type="button" class="btn btn-block btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true"
+                    aria-expanded="false">
+                Add an invariant
+                <span class="caret"></span>
+            </button>
+            <ul id="invars" class="dropdown-menu scrollable-menu" role="menu">
+
+            </ul>
+        </div>
+
+        <!-- Dropdown with functions -->
+        <div class="btn-group" role="group">
+            <button type="button" class="btn btn-block btn-default dropdown-toggle" data-toggle="dropdown" aria-haspopup="true"
+                    aria-expanded="false">
+                Add a function
+                <span class="caret"></span>
+            </button>
+            <ul class="dropdown-menu" id="functions">
+                <li><a id="sqrt"> Square root </a></li>
+                <li><a id="max" > Maximum </a></li>
+                <li><a id="min" > Minimum </a></li>
+                <li><a id="floor"> Floor </a></li>
+                <li><a id="ceil" > Ceiling </a></li>
+                <li><a id="logb" > Logarithm with Base </a></li>
+                <li><a id="log2" > Logarithm base 10</a></li>
+                <li><a id="log10"> Logarithm base 2</a></li>
+                <li><a id="exp" > Exp </a></li>
+                <li><a id="congruent"> Congruence under modulus</a></li>
+                <li><a id="mod" > Modulus </a></li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <textarea id="newTheorem" class="form-control" rows="3" placeholder="Add a new theorem here"></textarea>
+        <button id="addthm" class="btn btn-block btn-primary" type="button">Add Theorem</button>
+    </div>
+
+</form>
+
+<div>
+    <p class="text-center">
+        If you wish to start over with the original values, you can open a new tab and go to this site.
+    </p>
+</div>
+
+<!-- Script to populate the page -->
+<script>
+    function split(data)
+    {
+        var array = [[],[],[]];
+        var keys = Object.keys(data);
+        keys.sort();
+        var bool = true;
+
+        keys.forEach(function(key){
+            if (data[key]["Type"] === "Bool") {
+                // if the invariant is a boolean, put it in the third column
+                array[2].push(key);
+            }
+            else {
+                // if it is not a boolean, then alternate between the first and second columns
+                if (bool) {
+                    array[0].push(key);
+                }
+                else {
+                    array[1].push(key);
+                }
+                bool = !bool;
+            }
+        });
+        return array;
+    }
+    function parseAndSet(data) {
+        var threes = split(data.Invariants);
+        var first = threes[0];
+        first.sort();
+        var second= threes[1];
+        second.sort();
+        var third = threes[2];
+        third.sort();
+        var keys = Object.keys(data.Invariants);
+        var column, div, label, boxone, boxtwo, close, text;
+        var drop;
+        for(var i = 0; i < keys.length; i++)
+        {
+            drop = document.getElementById("invars");
+            drop.innerHTML += "<li><a id='" + keys[i] + "'> " + data.Invariants[keys[i]].Name + "</a></li>";
+        }
+        for (var i = 0; i < first.length; i++) {
+            column = document.getElementById("firstColumn");
+            div = "<div class='form-group text-center'>";
+            label = "<label class='control-label col-sm-6'>" + data.Invariants[first[i]].Name + "</label>";
+            boxone = "<input class='col-sm-3' type='text' pattern=\"^[0-9]*$\" value='" + data.Invariants[first[i]].Value.Min + "' name='" + first[i] + "min'>";
+            boxtwo = "<input class='col-sm-3' type='text' pattern=\"[0-9]|'u'|'n'|'d'|'t'\" value='" + data.Invariants[first[i]].Value.Max + "' name='" + first[i] + "max'>";
+            close = "</div>";
+            text = div + label + boxone + boxtwo + close;
+            column.innerHTML += text;
+        }
+
+        for (var i = 0; i < second.length; i++) {
+            column = document.getElementById("secondColumn");
+            div = "<div class='form-group text-center'>";
+            label = "<label class='control-label col-sm-6'>" + data.Invariants[second[i]].Name + "</label>";
+            boxone = "<input class='col-sm-3' type='text' value='" + data.Invariants[second[i]].Value.Min + "' name='" + second[i] + "min'>";
+            boxtwo = "<input class='col-sm-3' type='text' value='" + data.Invariants[second[i]].Value.Max + "' name='" + second[i] + "max'>";
+            close = "</div>";
+            text = div + label + boxone + boxtwo + close;
+            column.innerHTML += text;
+        }
+        for (var i = 0; i < third.length; i++) {
+            column = document.getElementById("thirdColumn");
+            div = "<div class='form-group text-center'>";
+            label = "<label class='control-label col-sm-6'>" + data.Invariants[third[i]].Name + "</label>";
+            boxone = "<input class='col-sm-6' type='text' value='" + data.Invariants[third[i]].Value + "' name='" + third[i] + "'>";
+            close = "</div>";
+            text = div + label + boxone + close;
+            column.innerHTML += text;
+        }
+        sessionStorage.setItem('ingridObj', JSON.stringify(data));
+    }
+    var oldData = sessionStorage.getItem('ingridObj');
+    oldData = JSON.parse(oldData);
+    if(oldData)
+    {
+        parseAndSet(oldData);
+    }
+    else
+    {
+        parseAndSet(JSON.parse(<%- JSON.stringify(invs); %>));
+    }
+
+</script>
+
+<!-- Script to load the modal -->
+<script>
+    $(document).ready(function () {
+        // listen for a click in the functions list and a specific anchor
+        //  should insert any highlighted contents into the parenthesis of the function, or if no
+        //  text is selected then will not include anything in the parenthesis.
+        $("#functions li a").on('click', function () {
+            var $txt = jQuery("#newTheorem");
+            var start = $txt[0].selectionStart;
+            var end = $txt[0].selectionEnd;
+            var thm = $txt.val();
+            var func = $(this).attr("id");
+            if (func === "logb")
+                $txt.val(thm.substring(0, start) + func + "(" + thm.substring(start, end) + ", base )" + thm.substring(end));
+            else if (func === "mod")
+                $txt.val(thm.substring(0, start) + func + "( b, c, m)" + thm.substring(start));
+            else
+                $txt.val(thm.substring(0, start) + func + "(" + thm.substring(start, end) + ")" + thm.substring(end));
+        });
+        // listen for a click in the invariants list and a certain anchor
+        // if an invariant is selected then insert the invariant variable exactly where it is desired
+        $("#invars li a").on('click', function () {
+            var $txt = jQuery("#newTheorem");
+            var start = $txt[0].selectionStart;
+            var thm = $txt.val();
+            var inv = $(this).attr("id");
+            $txt.val(thm.substring(0, start) + inv + thm.substring(start));
+        });
+
+        // open the modal
+        $("#modalButton").click(function () {
+            $("#myModal").modal();
+        });
+        // add a new invariant
+        $("#addInvar").click(function () {
+            var name = $("#invarName").val();
+            var varName = $("#varName").val();
+
+            if(name === "" || varName === "")
+            {
+                alert("Invariant name and Variable name cannot be empty");
+                return;
+            }
+
+            var type = $("#radios input:radio:checked").val();
+            var elementsInOne = $("#columnOne > div").length;
+            var elementsInTwo = $("#columnTwo > div").length;
+            var item = {};
+            item.Name = name;
+            item.Trace= [];
+            item.Changed = 'True';
+
+            if(type === "Boolean")
+            {
+                item.Value = 'undt';
+                item.Type = "Bool";
+            }
+            else if(elementsInOne === elementsInTwo)
+            {
+                item.Value = {"Min": '1', "Max": 'undt'};
+                if(type === "Real")
+                    item.Type = "Real";
+                else if (type === "Integer")
+                    item.Type = "Integer";
+                else
+                    console.log("Something ain't right here");
+            }
+            else
+            {
+
+                item.Value = {"Min": '1', "Max": 'undt'};
+                if(type === "Real Valued")
+                    item.Type = "Real";
+                else if (type === "Integer Valued")
+                    item.Type = "Integer";
+                else
+                    console.log("Something ain't right here");
+            }
+            var obj=sessionStorage.getItem('ingridObj');
+            if(obj !== null)
+            {
+                obj = JSON.parse(obj);
+                obj.Invariants[varName] = item;
+                sessionStorage.setItem('ingridObj', JSON.stringify(obj));
+                location.reload();
+            }
+        });
+
+        $("#calculate").click(function() {
+            // get all values
+            var formElements = $("#invarForm").serializeArray();
+            var temp = JSON.parse(sessionStorage.getItem('ingridObj'));
+            console.log(temp);
+            var obj = temp.Invariants;
+            // regex for matching value to make sure they are legal /^[0-9]*.[0-9]*$|^undt$/gm
+            formElements.forEach(function (item) {
+                var name = item.name;
+                var value = item.value;
+                if (name.length > 3) {
+                    var tag = name.slice(-3);
+                    var varName = name.substring(0, name.length - 3);
+
+                    // if we have a min value, then edit its values
+                    if (tag == "min") {
+                        // set Changed to true if it was already true or if the value is different
+                        if(obj[varName].Changed === "False" || obj[varName].Changed === false)
+                        {
+                            obj[varName].Changed = (obj[varName].Value.Min !== value ? "True" : "False");
+
+                        }
+                        obj[varName].Value.Min = value;
+                    }
+                    // if we have a max value then edit its max values
+                    else if (tag == "max") {
+                        // set Changed to true if it was already true or if the value is different
+                        if(obj[varName].Changed === "False" || obj[varName].Changed === false)
+                            obj[varName].Changed = (obj[varName].Value.Min !== value ? "True" : "False");
+                        obj[varName].Value.Max = value;
+                    }
+                    // if their is a boolean value
+                    else {
+                        if (!['true', 'false', 'undt'].includes(value.toLowerCase())) {
+                            alert("Please use one of these values for Boolean variables: true, false, undt");
+                        }
+                        else {
+                            obj[name].Changed = (obj[name].Value !== value ? "True" : "False");
+                            obj[name].Value = value;
+                        }
+                    }
+                }
+            });
+
+            // save values in sessionStorage
+            temp.Invariants = obj;
+            sessionStorage.setItem('ingridObj', JSON.stringify(temp));
+            //temp = JSON.parse(temp);
+            console.log(temp);
+            temp = JSON.stringify(temp);
+            // make rpc call
+            $.post("http://www.ingrid2.com/rpc", temp, function(data){
+                console.log("RPC");
+                console.log(data);
+            }, "json");
+
+
+
+            // save new values over old values
+        });
+        $("#save").click(function(){
+            // make XMLHttpRequest here
+            var xmlhttp = new XMLHttpRequest();
+            var ingrobj = sessionStorage.getItem('ingridObj');
+            xmlhttp.onreadystatechange = function() {
+                if (xmlhttp.readyState == XMLHttpRequest.DONE) {
+                    document.getElementById('hiddenField').value = xmlhttp.responseText;
+                    document.getElementById('hiddenField').type = "text";
+                }
+            };
+            xmlhttp.open("POST", '/save');
+            xmlhttp.setRequestHeader('Content-Type', "application/json;charset=UTF-8");
+            xmlhttp.send(ingrobj);
+
+        });
+        $("#addthm").click(function(){
+            console.log("adding theorem");
+        });
+    });
+</script>
+
+<footer>
+    <p class="text-center"> Developed by: Steven Brown, Nathan Cruz, Kevin Duarte, and Kyle Jones<br>
+        Sponsored by: Drs. Ronald Dutton, Robert Brigham, and Zixia Song
+    </p>
+</footer>
+</body>
+</html>
