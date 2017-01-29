@@ -1053,6 +1053,7 @@ var graphDrawer = function() {
 		GRAPH.addNode(object.id);
 		scene.add( object );
 		
+		autoSave();
 		return object.id;
 	}
 	var addEdge = function(options) {
@@ -1091,13 +1092,11 @@ var graphDrawer = function() {
 		} 
 		//Loading
 		else {
-			var n1 = nodeMap[options.loading.load.node1];
-			var n2 = nodeMap[options.loading.load.node2];
+			var n1 = options.loading.nodeMap[options.loading.load.node1];
+			var n2 = options.loading.nodeMap[options.loading.load.node2];
 		
 			bool = GRAPH.addEdge(cube.id, n1, n2);
 		}
-		
-		
 		
 		//Check edge validity before creating object
 		if(bool) {
@@ -1111,24 +1110,28 @@ var graphDrawer = function() {
 			cube.position.set(edge.getMidPoint().x, edge.getMidPoint().y, edge.getMidPoint().z);
 			
 			scene.add( cube );
+			autoSave();
 		}
 	}
 	//Remvoes the node and edges attached to it (sync)
 	var removeNode = function(object) {
 		var list = GRAPH.removeNode(object.id);
 		removeObjects(list);
+		autoSave();
 	}
 	//Removes a single edge (sync)
 	var removeEdge = function(eId) {
 		var edge = GRAPH.findEdgeObject(eId);
 		var list = GRAPH.removeEdge(edge.getNode1(), edge.getNode2());
 		removeObjects(list);
+		autoSave();
 	}
 	//Removes everything (sync)
 	var clearGraph = function() {
 		while(GRAPH.nodes.length > 0) {
 			removeNode(scene.getObjectById(GRAPH.nodes[0].getId()));
 		}
+		autoSave();
 	}
 	//Actual function to remove the objects from display
 	var removeObjects = function(list) {
@@ -1498,7 +1501,8 @@ $(document).ready(function(){
 		
 	///////////////////////////////////////////////////////////////////////////////////////
 	/////////////// Buttons outside the renderer, and saving                ///////////////
-	/////////////// (Why this is seperate from buttons is just coincidence) ///////////////
+	/////////////// (Why this is seperate from other buttons is just        ///////////////
+	/////////////// coincidence)                                            ///////////////
 	///////////////////////////////////////////////////////////////////////////////////////	
 	
 	//Saving
@@ -1716,6 +1720,7 @@ $(document).ready(function(){
 				controls.enable = true;
 				SELECTED1 = null;
 				SELECTEDLIST = null;
+				autoSave();
 			}
 				break;
 			case 3:
@@ -1729,7 +1734,7 @@ $(document).ready(function(){
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////                               ~Misc~                                                                       ////////////////////////////////////
 ///////////////////////////  This section handles initializing the renderer, and setting up any other HTML for input over the canvas,  ////////////////////////////////////
-/////////////////////////// the function that handles the text in the hint box, and loading the graph.                                 ////////////////////////////////////
+/////////////////////////// the function that handles the text in the hint box, loading the graph, autosaving to session storage.      ////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
@@ -1770,8 +1775,12 @@ function init() {
 	scene.add(plane);
 	
 	hintBox();
+	
+	//Auto load anything from session storage
+	if(sessionStorage.getItem('graph')) {
+		load(sessionStorage.getItem('graph'));
+	}
 }
-
 
 function hintBox(text="") {			
 	if(text != "") {
@@ -1780,11 +1789,9 @@ function hintBox(text="") {
 	$("#hint").html(text + "Ctrl + Q - resets the camera view<br/>Hold Down Right Mouse Button - Pan<br/>Scroll - Zoom In/Out<br/>");
 }
 
-
-
 //Loading a Graph in
-function load() {
-	var obj = JSON.parse(degstr);
+function load(obj) {
+	obj = JSON.parse(obj);
 	var nodeMap = [];
 	var newId;
 		
@@ -1796,10 +1803,54 @@ function load() {
 	for(var i = 0; i < obj.edges.length; i++) {
 		GRAPHDRAWER.addEdge({loading: {load: obj.edges[i], nodeMap: nodeMap}});
 	}
-							
-	camera.zoom = obj.camera.getZoom();
-	camera.position.set(obj.camera.getPosition());
+	
+	camera.zoom = obj.camera.zoom;
+	camera.position.set(obj.camera.position.x, obj.camera.position.y, obj.camera.position.z);
 }
+
+//Autosaving to session storage
+function autoSave() {
+	var obj;
+	
+	for(var i = 0; i < GRAPH.nodes.length; i++) {
+		obj = scene.getObjectById(GRAPH.nodes[i].getId());
+		GRAPH.nodes[i].setPosition(obj.position);
+		GRAPH.nodes[i].setColor(obj.material.color.getHex());
+	}	
+		
+	GRAPH.camera.setPosition(camera.position);
+	GRAPH.camera.setZoom(camera.zoom);
+		
+	obj = {};
+	obj.nodes = [];
+		
+	for(var i = 0; i < GRAPH.nodes.length; i++) {
+		obj.nodes.push({id: GRAPH.nodes[i].getId(),
+			position: new THREE.Vector3(Math.round(GRAPH.nodes[i].getPosition().x * 100)/ 100,
+				Math.round(GRAPH.nodes[i].getPosition().y * 100)/ 100,
+				Math.round(GRAPH.nodes[i].getPosition().z * 100)/ 100),
+			color: GRAPH.nodes[i].getColor(),
+			name: GRAPH.nodes[i].getName()});
+	}
+		
+	obj.edges = [];
+	for(var i = 0; i < GRAPH.edges.length; i++) {
+		obj.edges.push({id: GRAPH.edges[i].getId(),
+			node1: GRAPH.edges[i].getNode1(),
+			node2: GRAPH.edges[i].getNode2(),
+			color: GRAPH.edges[i].getColor()});
+	}
+		
+	obj.camera = {};
+	obj.camera.position = new THREE.Vector3(Math.round(GRAPH.camera.getPosition().x * 100)/ 100, 
+		Math.round(GRAPH.camera.getPosition().y * 100)/ 100,
+		Math.round(GRAPH.camera.getPosition().z * 100)/ 100);
+	obj.camera.zoom = GRAPH.camera.getZoom();
+		
+	var json = JSON.stringify(obj);
+	sessionStorage.setItem('graph', json);
+}
+
 	
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////                ~Actions~                                                              /////////////////////////////////////////////////////////
@@ -1812,7 +1863,7 @@ function drawNode() {
 	} else {
 		intersects = raycaster.intersectObject( plane );
 		GRAPHDRAWER.addNode({position: intersects[0].point});
-	}
+}
 }
 function drawEdge() {
 	var intersects = raycaster.intersectObjects( scene.children );
@@ -1998,12 +2049,13 @@ function cleanUp() {
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////                               ~Animator/Rednerer~                                                         /////////////////////////////////////
+///////////////////////////                               ~Animator/Renderer~                                                         /////////////////////////////////////
 ///////////////////////////  Functions called to animate and render go here. Also, anything that needs to be checked constantly go    /////////////////////////////////////
 /////////////////////////// here, detecting where the mouse is to check for detection.                                                /////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 function animate() {
 	controls.update();
+	plane.position.set(camera.position.x, camera.position.y, PLANE_LAYER)
 		
 	requestAnimationFrame(animate); 
 	renderer.render(scene, camera);
@@ -2016,13 +2068,17 @@ function render() {
 	var intersects = raycaster.intersectObjects( scene.children );
 	if ( intersects.length > 0  && intersects[ 0 ].object.material.hasOwnProperty('emissive') && intersects[0].userData !== "text") {
 		if ( INTERSECTED != intersects[ 0 ].object ) {
-			if ( INTERSECTED ) INTERSECTED.material.emissive.setHex( INTERSECTED.currentHex );
+			if ( INTERSECTED ) {
+				INTERSECTED.material.emissive.setHex( INTERSECTED.currentHex );
+			}
 			INTERSECTED = intersects[ 0 ].object;
 			INTERSECTED.currentHex = INTERSECTED.material.emissive.getHex();
 			INTERSECTED.material.emissive.setHex( 0xff0000 );
 		}
 	} else {
-		if ( INTERSECTED ) INTERSECTED.material.emissive.setHex( INTERSECTED.currentHex );
+		if ( INTERSECTED ) {
+			INTERSECTED.material.emissive.setHex( INTERSECTED.currentHex );
+		}
 		INTERSECTED = null;
 	}
 }
