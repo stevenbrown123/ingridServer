@@ -9,15 +9,12 @@ var raycaster;
 var SELECTED1 = null;
 var SELECTED2 = null;
 var SELECTED = null;
-var SELECTIONLIST = null;
 var SELECTEDEDGE = null;
 //Modes
 var mode;
 //Manipulation
 var controls = null;
 var offset = new THREE.Vector3();
-var positions = null;
-var newPositions = null;
 var cancelConfirmation = 0;
 //PDF
 const CANVAS_WIDTH_PORTRAIT = 190;
@@ -37,7 +34,195 @@ const PLANE_SIZE = 10000;
 const NODE_RADIUS = 15;
 const CUBE_WIDTH = 5;
 const EDGE_WIDTH = 15;
+//Renaming
+var nodeToBeNamed = null;
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////                               ~Web Worker Manager~                                                        /////////////////////////////////////
+///////////////////////////  Handles anything that requires parallel processing to speed up the process.                              /////////////////////////////////////                              /////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////	
+var webWorkerManager = function() {
+	var maxWorkers = navigator.hardwareConcurrency || 4;
+	
+	var blobs = [];
+	var workers = [];
+	var jobCount = [];
+	
+	for(var i = 0; i < maxWorkers; i++) {
+		jobCount[i] = 0;
+		blobs.push(new Blob([
+		  document.querySelector('#webWorker').textContent
+		], { type: "text/javascript" }));
+		workers.push(new Worker(window.URL.createObjectURL(blobs[i])));
+		workers[i].onmessage = function(response) {
+			workerComm(response);
+		}
+	}
+	
+	var workerComm = function(response) {
+		
+	}
+	
+	var enlistWebWorker = function(message) {
+		var assigned = leastOccupiedWorker();
+		workers[assigned].postMessage(message);
+	}
+	
+	var leastOccupiedWorker = function() {
+		var x = Math.min.apply(null, jobCount);
+		return jobCount.indexOf(x);
+	}
+	
+	return {
+		enlistWebWorker: enlistWebWorker
+	};
+}
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////                               ~Animation~                                                                  ////////////////////////////////////
+///////////////////////////  Any function that deals with animation in general. Skipping, replaying, canceling, going on to the next  /////////////////////////////////////
+/////////////////////////// solution for animation. Hiding and showing buttons that affect animation.                                 /////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////	
+var animationControl = function() {
+	const MARGIN = 20;
+	
+	var skipAnimation = function() {		
+		if(mode === "complementMode") {
+			COMPLEMENT.skipAnimation();
+		}
+		else if(mode === "edgeContractionMode") {
+			EDGECONTRACTION.skipAnimation();
+		}
+		else if(mode === "eulerianCycleMode") {
+			EULERIANCYCLE.skipAnimation();
+		}
+	}
+	var nextAnimation = function() {
+		if(mode === "eulerianCycleMode") {
+			EULERIANCYCLE.nextSolution();
+		}
+	}
+	var prevAnimation = function() {
+		if(mode === "eulerianCycleMode") {
+			EULERIANCYCLE.prevSolution();
+		}
+	}
+	var replayAnimation = function() {
+		if(mode === "eulerianCycleMode") {
+			EULERIANCYCLE.replaySolution();
+		}
+		
+	}
+	//Called when the user switches modes
+	var cleanUpAnimation = function() {
+		if(mode === "eulerianCycleMode") {
+			EULERIANCYCLE.cleanUpAnimation();
+		}
+	}
+	var showButtons = function() {
+		$("#previous").show();
+		$("#next").show();
+		$("#replay").show();
+		$("#skip").show();
+		$("#solution-counter").show();
+	}
+	var hideButtons = function() {
+		$("#previous").hide();
+		$("#next").hide();
+		$("#skip").hide();
+		$("#replay").hide();
+		$("#solution-counter").hide();
+	}
+	var swapButtons = function(bool) {
+		if(bool === true) {
+			$("#skip").show();
+			$("#replay").hide();
+		} 
+		else {
+			$("#skip").hide();
+			$("#replay").show();
+		}	
+	}
+	var buttonSetup = function() {
+		$("#previous").appendTo("#renderer");
+		$("#previous").css( "zIndex", 2 );
+		$("#previous").css( "position", "absolute" );
+		
+		
+		$("#replay").appendTo("#renderer");
+		$("#replay").css( "zIndex", 2 );
+		$("#replay").css( "position", "absolute" );
+		
+		$("#skip").appendTo("#renderer");
+		$("#skip").css( "zIndex", 2 );
+		$("#skip").css( "position", "absolute" );
+		
+		$("#skip").width($("#replay").width());
+		$("#skip").height($("#skip").height());
+		
+		$("#next").appendTo("#renderer");
+		$("#next").css( "zIndex", 2 );
+		$("#next").css( "position", "absolute" );
 
+		$("#solution-counter").appendTo("#renderer");
+		$("#solution-counter").css( "zIndex", 2 );
+		$("#solution-counter").css( "position", "absolute" );
+		
+		$("#previous").hide();
+		$("#replay").hide();
+		$("#next").hide();
+		$("#skip").hide();
+		$("#solution-counter").hide();
+	}
+	var positionButtons = function() {
+		showButtons();
+		$("#previous").css("top", $("#renderer").height() - $("#previous").height()*2);
+		$("#previous").css("left", MARGIN );
+		
+		$("#replay").css("top", $("#previous").position().top);
+		$("#replay").css("left", $("#previous").position().left + $("#previous").width()*2 + MARGIN);
+		
+		$("#skip").css("top",$("#previous").position().top);
+		$("#skip").css("left", $("#previous").position().left + $("#previous").width()*2 + MARGIN);
+		
+		$("#next").css("top", $("#previous").position().top);
+		$("#next").css("left", $("#skip").position().left + $("#skip").width()*2 + MARGIN);
+		
+		$("#solution-counter").css("top", $("#previous").position().top);
+		$("#solution-counter").css("left", $("#next").position().left + $("#next").width()*2 + MARGIN);
+		
+		if(mode !== "eulerianCycleMode") {
+			hideButtons();
+		}
+		else {
+			swapButtons();
+		}
+	}	
+	
+	var updateCounter = function() {
+		if(mode === "eulerianCycleMode") {
+			if(EULERIANCYCLE.solutions === 0){
+				$("#solution-counter").text("0 solutions");
+			}
+			else {
+				$("#solution-counter").text( (EULERIANCYCLE.currSol+1) + " / " + EULERIANCYCLE.solutions.length);
+			}
+			
+		}		
+	}
+	
+	return {
+		nextAnimation: nextAnimation,
+		prevAnimation: prevAnimation,
+		replayAnimation: replayAnimation,
+		skipAnimation: skipAnimation,
+		cleanUpAnimation: cleanUpAnimation,
+		showButtons: showButtons,
+		hideButtons: hideButtons,
+		swapButtons: swapButtons,
+		buttonSetup: buttonSetup,
+		positionButtons: positionButtons,
+		updateCounter: updateCounter
+	};
+}
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////                This section deals with graph functions                        /////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,17 +236,22 @@ const EDGE_WIDTH = 15;
 
 	public methods:
 		main - performs all the necessary animation and graph manipulation
-		
-	Todo:
-	Allow the animation to be skipped
+		skipAnimation - called when user decides to do other stuff
 */
 var complement = function() {
 	const ANIMATION_TIME = 1000;
 	const ITERATIONS = ANIMATION_TIME/TIME_BT_FRAMES;
 	
+	var doing = false;
+	var timeouts = [];
+	
+	var matrix;
+	var size;
+	
 	var main = function() {
-		var size = GRAPH.nodes.length;
-		var matrix = setUpMatrix(size);
+		doing = true;
+		size = GRAPH.nodes.length;
+		matrix = setUpMatrix();
 		
 		//Adds the new edges to the old, all are needed for animation
 		for(var i = 0; i < size; i++) {
@@ -72,10 +262,10 @@ var complement = function() {
 			}
 		}
 		
-		animationSetUp(matrix, size);
+		animationSetUp();
 	}
 	//Adjancency matrix
-	var setUpMatrix = function(size) {
+	var setUpMatrix = function() {
 		var matrix = [];
 		
 		for(var i = 0; i < size; i++) {
@@ -93,26 +283,26 @@ var complement = function() {
 		return matrix;
 	}
 	//Fade in and fade out animation
-	var animationSetUp = function(matrix, size) {
+	var animationSetUp = function() {
 		for(var i = 0; i < ITERATIONS; i++) {
 			
 			(function(i) {
-				setTimeout( function() {
+				timeouts.push(setTimeout( function() {
 				
-				animation( matrix , size, i );
+				animation( i );
 
-				}, TIME_BT_FRAMES*(i + 1) );
+				}, TIME_BT_FRAMES*(i + 1) ));
 			})(i);
 		}
 		
-		setTimeout( function() {
+		timeouts.push(setTimeout( function() {
 				
-			completeAnimation( matrix, size);
+			completeAnimation();
 
-		}, ANIMATION_TIME );
+		}, ANIMATION_TIME ));
 	}
 	//Fades in/out for new/old edges
-	var animation = function(matrix, size, iteration) {
+	var animation = function(iteration) {
 		var obj;
 		
 		for(var i = 0; i < size; i++) {
@@ -136,7 +326,10 @@ var complement = function() {
 	}
 
 	//Removes all edges (needed for animation), and brings back the new edges
-	var completeAnimation = function(matrix, size) {
+	var completeAnimation = function() {
+		if(doing === false) {
+			return;
+		}
 		while(GRAPH.edges.length > 0) {
 			GRAPHDRAWER.removeEdge(GRAPH.edges[0].getId());
 		}
@@ -148,10 +341,22 @@ var complement = function() {
 				}
 			}
 		}
+		
+		doing = false;
+	}
+	
+	var skipAnimation = function() {
+		for (var i = 0; i < timeouts.length; i++) {
+			clearTimeout(timeouts[i]);
+		}
+		timeouts = [];
+		
+		completeAnimation();
 	}
 	
 	return {
-		main: main
+		main: main,
+		skipAnimation: skipAnimation
 	};
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -167,78 +372,80 @@ var complement = function() {
 	
 	public methods:
 	main - performs all the necessary animation and graph manipulation
-	
-	Todo:
-	Allow the animation to be skipped
+	skipAnimation - called when user decides to do other stuff
 */
 var edgeContraction = function() {
 	const ANIMATION_TIME = 1500;
 	const ITERATIONS = ANIMATION_TIME/TIME_BT_FRAMES;
+	
+	var timeouts = [];
+	var doing = false;;
+	
+	var node1;
+	var node2;
+
+	var pos1;
+	var pos2;
+		
+	var distance;
+	var distance1;
+	var distance2;
+		
+	var newLocation;
+		
+	var travelSpeed1;
+	var travelSpeed2;
 
 	//Visually outputs teh result
 	var main = function(n1, n2) {
-		n1 = scene.getObjectById(n1);
-		n2 = scene.getObjectById(n2);
+		doing = true;
+		node1 = scene.getObjectById(n1);
+		node2 = scene.getObjectById(n2);
 		
 		//Following determines the new location the new node,
 		//how fast the nodes should move towards each other for animation for each frame
-		var pos1 = n1.position;
-		var pos2 = n2.position;
+		pos1 = node1.position;
+		pos2 = node2.position;
 		
-		var distance = new THREE.Vector3(n2.position.x - n1.position.x, n2.position.y - n1.position.y, 0);
-		var distance1 = new THREE.Vector3(distance.x/2, distance.y/2, 0);
-		var distance2 = new THREE.Vector3(-distance.x/2, -distance.y/2, 0);
+		distance = new THREE.Vector3(node2.position.x - node1.position.x, node2.position.y - node1.position.y, 0);
+		distance1 = new THREE.Vector3(distance.x/2, distance.y/2, 0);
+		distance2 = new THREE.Vector3(-distance.x/2, -distance.y/2, 0);
 		
-		var newLocation = new THREE.Vector3(n1.position.x + distance.x/2, n1.position.y + distance.y/2, NODE_LAYER);
+		newLocation = new THREE.Vector3(node1.position.x + distance.x/2, node1.position.y + distance.y/2, NODE_LAYER);
 		
-		var travelSpeed1 = new THREE.Vector3(distance1.x/ITERATIONS, distance1.y/ITERATIONS, 0);
-		var travelSpeed2 = new THREE.Vector3(distance2.x/ITERATIONS, distance2.y/ITERATIONS, 0);
+		travelSpeed1 = new THREE.Vector3(distance1.x/ITERATIONS, distance1.y/ITERATIONS, 0);
+		travelSpeed2 = new THREE.Vector3(distance2.x/ITERATIONS, distance2.y/ITERATIONS, 0);
 		
+		animationSetUp();
+	}
+	
+	var animationSetUp = function() {
 		//Sets up the animation frames
 		for(var i = 0; i < ITERATIONS; i++) {
-			setTimeout( function() {
+			timeouts.push(setTimeout( function() {
 				
-			animation( n1 , travelSpeed1 );
-			animation( n2 , travelSpeed2 );
+			animation( node1 , travelSpeed1 );
+			animation( node2 , travelSpeed2 );
 
-			}, TIME_BT_FRAMES*(i + 1) );
+			}, TIME_BT_FRAMES*(i + 1) ));
 		}
 		//Displays the final results
-		setTimeout( function() {
+		timeouts.push(setTimeout( function() {
 			
-			completeAnimation( n1 , newLocation );
-			completeAnimation( n2 , newLocation );
-			updateGraph(n1, n2, newLocation);
+			completeAnimation( node1 , newLocation );
+			completeAnimation( node2 , newLocation );
+			updateGraph(node1, node2, newLocation);
 			
-		}, TIME_BT_FRAMES*(ITERATIONS + 1));
+		}, TIME_BT_FRAMES*(ITERATIONS + 1)));
 	}
 
 	//Moves the nodes and edges to the new location selected for the new node
 	var animation = function(node, vector) {
-		var deltaX = vector.x;
-		var deltaY = vector.y;
 		
 		//New position for the node
-		node.position.set(node.position.x + deltaX, node.position.y + deltaY, NODE_LAYER);
+		node.position.set(node.position.x + vector.x, node.position.y + vector.y, NODE_LAYER);
 		
-		SELECTEDLIST = GRAPH.findEdges(node.id);
-		var cube;
-		var edge;
-		
-		//Respositions the edges
-		for(var i = 0; i < SELECTEDLIST.length; i++) {
-			cube = scene.getObjectById(SELECTEDLIST[i][0]);
-			edge = GRAPH.findEdgeObject(SELECTEDLIST[i][0]);
-					
-			edge.recalculateLength();
-			edge.recalculateRotation();
-			edge.recalculateMidPoint();
-					
-			cube.scale.x = edge.getLength();
-			cube.rotation.z = edge.getRotation();
-			cube.position.set(edge.getMidPoint().x, edge.getMidPoint().y, edge.getMidPoint().z);
-		
-		}
+		GRAPHDRAWER.repositionEdges(node);
 	}
 
 	//Plops the the nodes and edges in correct location
@@ -248,28 +455,17 @@ var edgeContraction = function() {
 		
 		node.position.set(vector.x, vector.y, NODE_LAYER);
 		
-		SELECTEDLIST = GRAPH.findEdges(node.id);
-		var cube;
-		var edge;
-		
-		for(var i = 0; i < SELECTEDLIST.length; i++) {
-			cube = scene.getObjectById(SELECTEDLIST[i][0]);
-			edge = GRAPH.findEdgeObject(SELECTEDLIST[i][0]);
-					
-			edge.recalculateLength();
-			edge.recalculateRotation();
-			edge.recalculateMidPoint();
-					
-			cube.scale.x = edge.getLength();
-			cube.rotation.z = edge.getRotation();
-			cube.position.set(edge.getMidPoint().x, edge.getMidPoint().y, edge.getMidPoint().z);
-		}
+		GRAPHDRAWER.repositionEdges(node);
 	}
 	//Updates the actual graph
 	var updateGraph = function(n1, n2, vector) {
 		var newId;
 		var edgeList;
 		var temp;
+		
+		if(doing === false) {
+			return;
+		}
 		
 		//Grabs all edges of the old nodes
 		edgeList = GRAPH.findEdges(n1.id, true);
@@ -296,10 +492,24 @@ var edgeContraction = function() {
 			//Draws them out
 			GRAPHDRAWER.addEdge({selections: [scene.getObjectById(edgeList[i][0]), scene.getObjectById(edgeList[i][1])] });
 		}
+		
+		doing = false;
+	}
+	
+	var skipAnimation = function() {
+		for (var i = 0; i < timeouts.length; i++) {
+			clearTimeout(timeouts[i]);
+		}
+		timeouts = [];
+		
+		completeAnimation( node1 , newLocation );
+		completeAnimation( node2 , newLocation );
+		updateGraph(node1, node2, newLocation);
 	}
 	
 	return {
-		main: main
+		main: main,
+		skipAnimation: skipAnimation
 	};
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -320,8 +530,8 @@ var edgeContraction = function() {
 	
 	Todo:
 	Output all unique answers
-	Add a method to skip the animation
 	Add a method to visually display other unique cycles 
+	Fix skip
 */
 var eulerianCycle = function() {
 	const ANIMATION_TIME = 2000;
@@ -330,41 +540,53 @@ var eulerianCycle = function() {
 	const ARROW_LAYER = 0; //Keep at this value, it won't appear otherwise
 	const HEAD_LENGTH = 20;
 	const HEAD_WIDTH = 10;
-	var arrows = []; //visual objects
+	
+	var doing = false;
+	
+	var timeout = [];	
+	var solutions = [];
+	var currSol = 0;
+	var animationObjects = [];
+	var animationParameters = [];
+	
 	var actualIterations; //correction of ITERATIONS
+	var size;
+	var matrix;
+	
+	
+	var timeouts = [];//Animation that is still animating
 	
 	//Visually outputs answer
 	var main = function() {
-		var size;
-		var matrix;
-		var circuit;//the answer
-		
-		//Checks all qualifiying criteria
-		if(GRAPH.edges.length == 0) {
-			return [];
-		}	
-		if(!noOddDegrees()) {
-			return false;
+		if(solutions.length === 0) {
+			//Checks all qualifiying criteria
+			if(GRAPH.edges.length == 0) {
+				return [];
+			}	
+			if(!noOddDegrees()) {
+				return false;
+			}
+			size = GRAPH.nodes.length;
+			matrix = setUpMatrix();
+			if(!allNonZeroDegreeConnected()) {
+				return false;
+			}
+			
+			//The answer(s)
+			solutions.push(hierholzerAlgorithm());
+			
+			animationSetUp();
 		}
-		size = GRAPH.nodes.length;
-		matrix = setUpMatrix(size);
-		if(!allNonZeroDegreeConnected(matrix)) {
-			return false;
+		else {
+			animationSetUp();
 		}
 		
-		//The answer
-		circuit = hierholzerAlgorithm(matrix);
-		
-		for(var i = 0; i < circuit.length; i++) {
-			circuit[i] = circuit[i].getId();
-		}
-		
-		animationSetUp(circuit);
-		
-		return circuit;
+		ANIMATIONCONTROL.updateCounter().
+		return;
 	}
 	//Adjacency matrix
-	var setUpMatrix = function(size) {
+	var setUpMatrix = function() {
+		ANIMATIONCONTROL.swapButtons(true);
 		var matrix = [];
 		
 		for(var i = 0; i < size; i++) {
@@ -391,7 +613,7 @@ var eulerianCycle = function() {
 		return true;
 	}
 	//Criteria for eularian cycle
-	var allNonZeroDegreeConnected = function(matrix) {
+	var allNonZeroDegreeConnected = function() {
 		var bool = true;//assume true
 		
 		var notVisited = new Set(GRAPH.nodes);
@@ -463,7 +685,7 @@ var eulerianCycle = function() {
 	}
 	
 	//The actual algorithm
-	var hierholzerAlgorithm = function(matrix) {
+	var hierholzerAlgorithm = function() {
 		var circuit = [];
 		var unusedEdges = {}; //"id of node" => # of unused edges
 		var edgesVisited = new Set();
@@ -478,6 +700,21 @@ var eulerianCycle = function() {
 				break;
 			}
 		}
+		
+		setUpMessage(circuit, unusuedEdges, edgesVisited, statrt, last)
+		
+		WEBWORKERMANAGER.enlistWebWorker(JSON.stringify({
+			type: "EC",
+			context: {
+				circuit: circuit,
+				unusedEdges: unusedEdges,
+				edgesVisited: Array.from(edgesVisited),
+				start: {
+					
+				},
+				last, last
+			}
+		}));
 		
 		while(true) {
 			//Finds first adjacent node to continue path
@@ -542,8 +779,19 @@ var eulerianCycle = function() {
 		}
 	}
 	
+	var setUpMessage = function() {
+		
+	}
+	
 	//Animation where the arrows are drawn out incrementally starting with the first edge to the last in the circuit
-	var animationSetUp = function(circuit) {
+	var animationSetUp = function() {
+		ANIMATIONCONTROL.swapButtons(true);
+		
+		var circuit = [];
+		for(var i = 0; i < solutions[currSol].length; i++) {
+			circuit.push(solutions[currSol][i].getId());
+		}
+		
 		var iterationsPerEdge = ITERATIONS/(circuit.length - 1);
 		var endPoints = [];
 		var directionVectors = [];
@@ -565,10 +813,14 @@ var eulerianCycle = function() {
 		iterationsPerEdge = Math.ceil(iterationsPerEdge);
 		actualIterations = iterationsPerEdge * directionVectors.length;//actual total iterations
 		
+		animationParameters[currSol] = {endPoints: endPoints,
+			directionVectors: directionVectors,
+			finalLengths: finalLengths};
+		
 		//Set up for animation
 		for(var i = 0; i < actualIterations; i++) {
 			
-			(function(i) {
+			timeouts.push((function(i) {
 				setTimeout(function() {
 	
 				animation(endPoints[Math.floor(i/iterationsPerEdge)], 
@@ -577,48 +829,86 @@ var eulerianCycle = function() {
 				Math.floor(i/iterationsPerEdge));
 			
 				}, (i + 1)*TIME_BT_FRAMES);
-			})(i);
+			})(i));
 		}
 		
-		setTimeout(function() {
+		timeouts.push(setTimeout(function() {
 			
 			animationComplete(endPoints, directionVectors, finalLengths);
 			
-		}, (actualIterations + 1)*TIME_BT_FRAMES );
+		}, (actualIterations + 1)*TIME_BT_FRAMES ));
 		
 	}
 	//Draws the arrows incrementally, and replaces an old arrow when appropriate
 	var animation = function(orig, dir, length, i) {
-		if(arrows[i] === undefined) {
-			arrows[i] = new THREE.ArrowHelper( dir, orig, length, ARROW_COLOR , HEAD_LENGTH, HEAD_LENGTH  )
-			scene.add( arrows[i] )
+		if(animationObjects[i] === undefined) {
+			animationObjects[i] = new THREE.ArrowHelper( dir, orig, length, ARROW_COLOR , HEAD_LENGTH, HEAD_LENGTH  )
+			scene.add( animationObjects[i] )
 		}
 		else {
-			scene.remove( arrows[i] );
-			arrows[i] = new THREE.ArrowHelper( dir, orig, length, ARROW_COLOR , HEAD_LENGTH, HEAD_LENGTH  )
-			scene.add( arrows[i] )
+			scene.remove( animationObjects[i] );
+			animationObjects[i] = new THREE.ArrowHelper( dir, orig, length, ARROW_COLOR , HEAD_LENGTH, HEAD_LENGTH  )
+			scene.add( animationObjects[i] )
 		}
 	}
 	//Final visual
 	var animationComplete = function(endPoints, directionVectors, finalLengths) {
 		
 		for(var i = 0; i < directionVectors.length; i++) {
-			scene.remove( arrows[i] );
-			arrows[i] = new THREE.ArrowHelper( directionVectors[i], endPoints[i], finalLengths[i], ARROW_COLOR , HEAD_LENGTH, HEAD_LENGTH  );
-			scene.add( arrows[i] );
+			scene.remove( animationObjects[i] );
+			animationObjects[i] = new THREE.ArrowHelper( directionVectors[i], endPoints[i], finalLengths[i], ARROW_COLOR , HEAD_LENGTH, HEAD_LENGTH  );
+			scene.add( animationObjects[i] );
 		}
+		ANIMATIONCONTROL.swapButtons(false);
 	}
-	//Cleans up visual
-	var resetArrows = function() {
-		for(var i = 0; i < arrows.length; i++) {
-			scene.remove(arrows[i]);
+	//Skip the animation
+	var skipAnimation = function() {
+		for(var i = 0; i < timeouts.length; i++) {
+			clearTimeout(timeouts[i]);
 		}
-		arrows = [];
+		timeouts = [];
+		cleanUpAnimation();
+		animationComplete(animationParameters[currSol].endPoints,
+			animationParameters[currSol].directionVectors,
+			animationParameters[currSol].finalLengths)
+	}
+	//Clear the animation
+	var cleanUpAnimation = function(){
+		for(var i = 0; i < animationObjects.length; i++) {
+			scene.remove(animationObjects[i]);
+		}
+		animationObjects = [];
+	}
+	var clearSolutions = function() {
+		solutions = [];
+	}
+	
+	var nextSolution = function() {
+		cleanUpAnimation();
+		currSol = (currSol + 1)%solutions.length;
+		animationSetUp();
+	}
+	var prevSolution = function() {
+		cleanUpAnimation();
+		currSol = ((currSol - 1 >= 0)? currSol - 1 : solutions.length - 1)%solutions.length;
+		animationSetUp();
+	}
+	var replaySolution = function() {
+		cleanUpAnimation();
+		animationSetUp();
 	}
 	
 	return {
-		resetArrows: resetArrows,
-		main: main
+		solutions: solutions,
+		currSol: currSol,
+		
+		doing: doing,
+		main: main,
+		skipAnimation: skipAnimation,
+		cleanUpAnimation: cleanUpAnimation,
+		nextSolution: nextSolution,
+		prevSolution: prevSolution,
+		replaySolution: replaySolution
 	}
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1041,6 +1331,7 @@ var graphDrawer = function() {
 			object.position.y = options.position.y;
 			object.position.z = NODE_LAYER;
 			object.userData = "Node";
+			
 		} else {
 			geometry = new THREE.CircleBufferGeometry( NODE_RADIUS , 32 );
 			object = new THREE.Mesh( geometry, new THREE.MeshLambertMaterial( { color: options.load.color} ) );
@@ -1087,7 +1378,7 @@ var graphDrawer = function() {
 		var bool = false;//Assume edge is invalid
 		
 		//For everything else, validates edge, or not
-		if(typeof options.selections != "undefined") {
+		if(typeof options.selections !== "undefined") {
 			bool = GRAPH.addEdge(cube.id, options.selections[0].id, options.selections[1].id);
 		} 
 		//Loading
@@ -1139,7 +1430,10 @@ var graphDrawer = function() {
 			scene.remove(scene.getObjectById(list[i], true));
 		}
 	}
-	var nameNode = function(name) {		
+	var nameNode = function(name, theNodeToBeNamed) {
+		theNodeToBeNamed = scene.getObjectById(theNodeToBeNamed);
+		console.log(theNodeToBeNamed);
+	
 		var bitmap = document.createElement('canvas');
 		var g = bitmap.getContext('2d');
 		
@@ -1170,14 +1464,34 @@ var graphDrawer = function() {
 		texture.minFilter = THREE.LinearFilter;
 		
 		material = new THREE.MeshBasicMaterial({ map : texture, /*transparent: true*/})
-		plane = new THREE.Mesh(new THREE.PlaneGeometry(name.length*100, 100), material);
+		plane = new THREE.Mesh(new THREE.PlaneGeometry(name.length*20, 20), material);
 		plane.material.side = THREE.DoubleSide;
-		plane.position.z = -200;
+		plane.position.set(theNodeToBeNamed.position.x, theNodeToBeNamed.position.y, -200);
 		plane.userData = "text";
 		
+		console.log(plane.position);
 		scene.add(plane);
+	}
+	
+	var repositionEdges = function(nodeObj) {
+		var list = GRAPH.findEdges(nodeObj.id);
 		
-		console.log(name);
+		var object;
+		var edge;
+				
+		for(var i = 0; i < list.length; i++) {
+			object = scene.getObjectById(list[i][0]);
+			edge = GRAPH.findEdgeObject(list[i][0]);
+					
+			edge.recalculateLength();
+			edge.recalculateRotation();
+			edge.recalculateMidPoint();
+					
+			object.position.set(edge.getMidPoint().x, edge.getMidPoint().y, edge.getMidPoint().z);
+			object.scale.x = edge.getLength();
+			object.rotation.z = edge.getRotation();
+			autoSave();
+		}
 	}
 	
 	return {
@@ -1186,7 +1500,8 @@ var graphDrawer = function() {
 		removeNode : removeNode,
 		removeEdge : removeEdge,
 		clearGraph : clearGraph,
-		nameNode : nameNode
+		nameNode : nameNode,
+		repositionEdges: repositionEdges
 	};
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1209,7 +1524,20 @@ var graphDrawer = function() {
 */
 
 var graphParser = function() {
-
+	//Force Bassed Generation
+	const K = 40;
+	const REPULSION = 20;
+	const DAMP = 0.2;
+	const MAXSPEED = 40;
+	const M = 50;
+	const LENGTH = 50;
+	const TIMESTEP = 0.01;
+	const ENERGYMIN = 10;
+	const CENTERATTRACTION = 50;//Ignore the name, the higher, the weaker
+	//Initializing
+	const DISTANCEFROMCENTER = 200;
+	
+	
 	//Parses the node and edge set
 	var parseSet = function(nodeStr, edgeStr) {
 
@@ -1305,11 +1633,11 @@ var graphParser = function() {
 			hintBox(str);
 		}
 		
-		nodeSet = Array.from(result.nodeSet);
-		edgeSet = Array.from(result.edgeSet);
+		nodeSet = Array.from(nodeSet);
+		edgeSet = Array.from(edgeSet);
 		
-		//Generate the graph...
-		return;
+		//Generate the graph
+		forceBasedGraphGeneration(nodeSet, edgeSet);;
 	}
 
 	//Parses degree sequence
@@ -1348,8 +1676,8 @@ var graphParser = function() {
 			edgeSet = errorMsg.edgeSet;
 		}
 		
-		//Generate the graph...
-		return;
+		//Generate the graph
+		forceBasedGraphGeneration(nodeSet, edgeSet);
 	}
 	//Degree sequence to Node and Edge set
 	var havel_hakiniAlgorithm = function(degArray) {
@@ -1381,6 +1709,7 @@ var graphParser = function() {
 		
 		//Make nodes
 		for(var i = 0; i < degArray.length ; i++) {
+			degArray[i];
 			nodeSet.push({id: "_" + i, degReq: degArray[i]});
 		}
 		
@@ -1395,9 +1724,8 @@ var graphParser = function() {
 		
 		//Make edges
 		while(nodeSet[0].degReq != 0) {
-			
 			//Add edges while decrementing the required degree for the respective nodes
-			for(var i = 1; i <= nodeSet.degReq; i++) {
+			for(var i = 1; i <= nodeSet[0].degReq; i++) {
 				edgeSet.push([nodeSet[0].id, nodeSet[i].id]);
 				nodeSet[i].degReq--;
 			}
@@ -1413,8 +1741,200 @@ var graphParser = function() {
 			});
 		}
 		
+		//Node set needs to be strings for next set
+		for(var i = 0; i < nodeSet.length; i++) {
+			nodeSet[i] = nodeSet[i].id;
+		}
+		
 		return {nodeSet: nodeSet, edgeSet: edgeSet};
 	}
+	
+	//Forced Based Algorithm to generate a clean graph
+	var forceBasedGraphGeneration = function(nodeSet, edgeSet) {
+		GRAPHDRAWER.clearGraph();
+		
+		var points = [];
+		initGraph(points, nodeSet, edgeSet);
+		
+		var matrix = setUpMatrix(points);
+		
+		do {
+			coloumbslaw(points);
+			hookeslaw(points, matrix);
+			attractToCenter(points);
+			updateVelocity(points);
+			updatePosition(points);
+			for(var i = 0; i < points.length; i++) {
+				GRAPHDRAWER.repositionEdges(scene.getObjectById(points[i].id));
+			}
+			console.log(calculateEnergy(points));			
+		} while(calculateEnergy(points) > ENERGYMIN);
+	}
+	
+	var calculateEnergy = function(points) {
+		var total = 0;
+		for(var i = 0; i < points.length; i++) {
+			total += Math.sqrt(points[i].v.x*points[i].v.x + points[i].v.y*points[i].v.y);
+		}
+		return total;
+	}
+	
+	var updatePosition = function(points) {
+		var obj;
+		for(var i = 0; i < points.length; i++) {
+			obj = scene.getObjectById(points[i].id);
+			obj.position.x = points[i].v.x * TIMESTEP + obj.position.x;
+			obj.position.y = points[i].v.y * TIMESTEP + obj.position.y;
+		}
+	}
+	
+	var updateVelocity = function(points) {
+		var v;
+		
+		for(var i = 0; i < points.length; i++) {
+			v = new THREE.Vector3();
+			v.copy(points[i].v);
+			v.add(new THREE.Vector3(points[i].a.x * TIMESTEP * DAMP, points[i].a.y * TIMESTEP * DAMP, 0));
+			
+			if(Math.sqrt(v.x*v.x + v.y*v.y) > MAXSPEED) {
+				v.copy(v.normalize().multiplyScalar(MAXSPEED));
+			}
+			points[i].v.copy(v);
+			points[i].a = new THREE.Vector3(0,0,0);
+		}
+	}
+	
+	//Keep nodes to the center as much as possible
+	var attractToCenter = function(points) {
+		var position;
+		for(var i = 0; i < points.length; i++) {
+			position = new THREE.Vector3().copy(scene.getObjectById(points[i].id).position);
+			applyForce(position.multiplyScalar(-1*REPULSION/CENTERATTRACTION), points[i]);
+		}
+	}
+	
+	//Hooke's Law
+	var hookeslaw = function(points, matrix) {
+		var distance = new THREE.Vector3();
+		var magnitude;
+		var dir = new THREE.Vector3();
+		
+		var obj1;
+		var obj2;
+		
+		for(var i = 0; i < GRAPH.nodes.length; i++) {		
+			for(var j = 0; j < GRAPH.nodes.length; j++) {
+				if(GRAPH.nodes[i].getId() == GRAPH.nodes[j].getId()) {
+					continue;
+				}
+				if(!matrix[GRAPH.nodes[i].getId()][GRAPH.nodes[j].getId()]) {
+					continue;
+				}
+				
+				obj1 = scene.getObjectById(GRAPH.nodes[i].getId());
+				obj2 = scene.getObjectById(GRAPH.nodes[j].getId());
+				
+				distance = new THREE.Vector3(obj1.position.x - obj2.position.x,
+					obj1.position.y - obj2.position.y,
+					obj1.position.z - obj2.position.z);
+				
+				dir.copy(distance);
+				dir.normalize();
+				
+				magnitude = Math.sqrt(Math.pow(distance.x, 2) + Math.pow(distance.y, 2));
+				
+				applyForce(new THREE.Vector3(dir.x, dir.y, 0).multiplyScalar(K*-0.5*(magnitude-LENGTH))
+					, getPoint(points, GRAPH.nodes[i].getId()));
+				applyForce(new THREE.Vector3(dir.x, dir.y, 0).multiplyScalar(K*0.5*(magnitude-LENGTH))
+					, getPoint(points, GRAPH.nodes[j].getId()));
+			}
+		}
+	}
+	
+	//Coloumb's Law
+	var coloumbslaw = function(points) {
+		var distance = new THREE.Vector3();
+		var magnitude;
+		var dir = new THREE.Vector3();
+		
+		var obj1;
+		var obj2;
+		
+		for(var i = 0; i < GRAPH.nodes.length; i++) {		
+			for(var j = 0; j < GRAPH.nodes.length; j++) {
+				if(GRAPH.nodes[i].getId() == GRAPH.nodes[j].getId()) {
+					continue;
+				}
+				
+				obj1 = scene.getObjectById(GRAPH.nodes[i].getId());
+				obj2 = scene.getObjectById(GRAPH.nodes[j].getId());
+				
+				distance = new THREE.Vector3(obj1.position.x - obj2.position.x,
+					obj1.position.y - obj2.position.y,
+					0);
+				
+				dir.copy(distance);
+				dir.normalize();
+				
+				magnitude = Math.sqrt(Math.pow(distance.x, 2) + Math.pow(distance.y, 2));
+				
+				applyForce(new THREE.Vector3(dir.x * REPULSION, 
+					dir.y * REPULSION, 0).divideScalar(magnitude*magnitude*0.5), getPoint(points, GRAPH.nodes[i].getId()));
+				applyForce(new THREE.Vector3(dir.x * REPULSION,
+					dir.y * REPULSION, 0).divideScalar(magnitude*magnitude*-0.5), getPoint(points, GRAPH.nodes[j].getId()));
+			}
+		}
+	}
+	
+	var applyForce = function(force, point) {
+		point.a.add(new THREE.Vector3(force.x/point.m, force.y/point.m, 0));
+	}
+	
+	var getPoint = function(points, id) {
+		for(var i = 0; i < points.length; i++) {
+			if(points[i].id == id) {
+				return points[i];
+			}
+		}
+	}
+	
+	//Generate intial positons of nodes.
+	var initGraph = function(points, nodeSet, edgeSet) {
+		var mapNodes = {};
+		var id;
+		var deg;
+		
+		for(var i = 0; i < nodeSet.length; i++) {
+			deg = Math.PI*2/nodeSet.length*i
+			id = GRAPHDRAWER.addNode({position: new THREE.Vector3(Math.cos(deg)*DISTANCEFROMCENTER,
+				Math.sin(deg)*DISTANCEFROMCENTER, NODE_LAYER)});
+			points.push({id: id, m: M, v: new THREE.Vector3(0,0,0), a: new THREE.Vector3(0,0,0)});
+			mapNodes[nodeSet[i]] = id;
+		}
+		
+		for(var i = 0; i < edgeSet.length; i++) {
+			GRAPHDRAWER.addEdge({selections: [scene.getObjectById(mapNodes[edgeSet[i][0]]), scene.getObjectById(mapNodes[edgeSet[i][1]])]});
+		}
+	}
+	
+	//Adjancency matrix
+	var setUpMatrix = function() {
+		var matrix = [];
+		
+		for(var i = 0; i < GRAPH.nodes.length; i++) {
+			matrix[GRAPH.nodes[i].getId()] = [];
+			
+			for(var j = 0; j < GRAPH.nodes.length; j++) {
+				matrix[GRAPH.nodes[i].getId()][GRAPH.nodes[j].getId()] = (GRAPH.findEdge(GRAPH.nodes[i].getId(), GRAPH.nodes[j].getId()) != null);
+			}
+		}
+		
+		for(var i = 0; i < GRAPH.nodes.length; i++) {
+			matrix[GRAPH.nodes[i].getId()][GRAPH.nodes[i].getId()] = null;
+		}
+		
+		return matrix;
+	}	
 	
 	return {
 		parseSet: parseSet,
@@ -1428,6 +1948,10 @@ var graphParser = function() {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////                This is where the actual fun begins                            /////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+//Animation
+var ANIMATIONCONTROL = new animationControl();
+var WEBWORKERMANAGER = new webWorkerManager();
 
 //Graph
 var GRAPH = Graph();
@@ -1488,12 +2012,14 @@ $(document).ready(function(){
 	
 	//Submissions
 	$("#submit-set").click(function() {
+		submitSetMode();
 		var nodestr = $("#nodes").val();
 		var edgestr = $("#edges").val();
 		
 		GRAPHPARSER.parseSet(nodestr, edgestr);
 	});
 	$("#submit-seq").click(function() {
+		submitSeqMode();
 		var degstr = $("#degree-seq").val();
 		
 		GRAPHPARSER.parseSeq(degstr);
@@ -1581,14 +2107,15 @@ $(document).ready(function(){
 	
 	//Resizing and Locating Mouse
 	$(window).resize(function(){
-		renderer.setSize( $("#renderer").width(), $("#renderer").height() );
-		camera.left = $("#renderer").width() / - 2;
-		camera.right = $("#renderer").width() / 2;
-		camera.top = $("#renderer").height() / 2;
-		camera.bottom = $("#renderer").height() / - 2;
+		renderer.setSize( $("#renderer").width()*.98, $("#renderer").height()*.98 );
+		camera.left = $("canvas").width() / - 2;
+		camera.right = $("canvas").width() / 2;
+		camera.top = $("canvas").height() / 2;
+		camera.bottom = $("canvas").height() / - 2;
 		camera.updateProjectionMatrix();
+		ANIMATIONCONTROL.positionButtons();
 	});			
-	$("#renderer").mousemove(function(event){
+	$("canvas").mousemove(function(event){
 		var totalOffsetX = 0;
 		var totalOffsetY = 0;
 		var canvasX = 0;
@@ -1610,16 +2137,19 @@ $(document).ready(function(){
 	});
 	
 	//Enables/Disables controls
-	$("#renderer").mouseleave(function() {
+	$("canvas").mouseleave(function() {
 		controls.enable = false;
 	});
-	$("#renderer").mouseenter(function() {
+	$("canvas").mouseenter(function() {
 		controls.enable = true;
 	});
-	
+	///////////////////////////////////////////////////////////////////////////////////////
+	/////////////// Handlers for when the user actively    ////////////////////////////////
+    /////////////// interacts the page.                    ////////////////////////////////
+	///////////////////////////////////////////////////////////////////////////////////////	
 	
 	//Modes
-	$("#renderer").click(function(event) {
+	$("canvas").click(function(event) {
 		if(mode == "drawNode") {
 			drawNode();
 		}
@@ -1632,40 +2162,11 @@ $(document).ready(function(){
 		else if(mode == "deleteEdge") {
 			deleteEdge();
 		}
-		else if(mode == "contractionMode") {
+		else if(mode == "edgeContractionMode") {
 			contractEdge();
 		}
 		else if(mode == "renameNodeMode") {
 			renameNode(event.pageX, (event.pageY - $(this).offset().top));
-		}
-	});
-	
-	///////////////////////////////////////////////////////////////////////////////////////
-	/////////////// Handlers for when the user actively    ////////////////////////////////
-    /////////////// interacts the page.                    ////////////////////////////////
-	///////////////////////////////////////////////////////////////////////////////////////	
-	
-	//Naming a node via input form
-	$("#nodeNameInput").hide();
-	$(window).click(function(){
-		cancelConfirmation++;
-		
-		if(cancelConfirmation == 2) {
-			$("#nodeNameInput").hide();
-			$("#nodeName").val("");
-			cancelConfirmation = 0;
-		}
-	});
-	$("#nodeNameInput").click(function(event){
-		event.stopPropagation();
-	});
-	$("#nodeNameInput").on('keyup', function (e) {
-		if(e.keyCode == 13 && $("#nameNodeInput").css("display") !== "none") {
-			var name = $("#nodeName").val();
-			nameNode(name);
-			$("#nodeName").val("");
-			$("#nodeNameInput").hide();
-			cancelConfirmation = 0;
 		}
 	});
 	
@@ -1684,7 +2185,6 @@ $(document).ready(function(){
 			if(intersects.length > 0 && intersects[0].object.userData == "Node") {
 				controls.enable = false;
 				SELECTED1 = intersects[0].object;
-				SELECTEDLIST = GRAPH.findEdges(SELECTED1.id);
 			}
 		}
 	});
@@ -1695,21 +2195,7 @@ $(document).ready(function(){
 				var intersects = raycaster.intersectObject( plane );
 				SELECTED1.position.set(intersects[0].point.x, intersects[0].point.y, NODE_LAYER);
 				
-				var object;
-				var edge;
-				
-				for(var i = 0; i < SELECTEDLIST.length; i++) {
-					object = scene.getObjectById(SELECTEDLIST[i][0]);
-					edge = GRAPH.findEdgeObject(SELECTEDLIST[i][0]);
-					
-					edge.recalculateLength();
-					edge.recalculateRotation();
-					edge.recalculateMidPoint();
-					
-					object.position.set(edge.getMidPoint().x, edge.getMidPoint().y, edge.getMidPoint().z);
-					object.scale.x = edge.getLength();
-					object.rotation.z = edge.getRotation();
-				}
+				GRAPHDRAWER.repositionEdges(SELECTED1);
 			}
 		}
 	});
@@ -1719,7 +2205,6 @@ $(document).ready(function(){
 				if(mode == "moveNode") {
 				controls.enable = true;
 				SELECTED1 = null;
-				SELECTEDLIST = null;
 				autoSave();
 			}
 				break;
@@ -1729,6 +2214,33 @@ $(document).ready(function(){
 		}
 		
 	});
+	
+	//Naming a node via input form
+	$(window).click(function(){
+		cancelConfirmation++;
+		
+		if(cancelConfirmation == 2) {
+			$("#nodeNameInput").hide();
+			$("#nodeName").val("");
+			cancelConfirmation = 0;
+			notToBeNamed = null;
+		}
+	});
+	$("#nodeNameInput").click(function(event){
+		event.stopPropagation();
+	});
+	$("#nodeNameInput").on('keyup', function (e) {
+		if(e.keyCode == 13 && $("#nameNodeInput").css("display") !== "none") {
+			var name = $("#nodeName").val();
+			nameNode(name, nodeToBeNamed);
+			nodeToBeNamed = null;
+			$("#nodeName").val("");
+			$("#nodeNameInput").hide();
+			cancelConfirmation = 0;
+		}
+	});
+	
+	
 });
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1749,19 +2261,11 @@ function init() {
 	//Setup and Detection
 	raycaster = new THREE.Raycaster();
 	renderer = new THREE.WebGLRenderer({antialias: false, preserveDrawingBuffer: true});
-	renderer.setSize( $("#renderer").width(), $("#renderer").height() ); 
+	renderer.setSize( $("#renderer").width()*.98, $("#renderer").height()*.98 ); 
 	renderer.setClearColor( 0xa0f0f0 ); 
 	renderer.setPixelRatio( window.devicePixelRatio );
 	renderer.sortObjects = false;
 	$("#renderer").get(0).appendChild(renderer.domElement);
-	
-	//Allow stacking on top of canvas (buttons, inputs, etc.)
-	renderer.domElement.style.position = "absolute";
-	renderer.domElement.style.zIndex = 0;
-	
-	$("#nodeNameInput").appendTo("#renderer");
-	$("#nodeNameInput").css( "zIndex", 2 );
-	$("#nodeNameInput").css( "position", "absolute" );
 	
 	//Control setup
 	controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -1774,7 +2278,19 @@ function init() {
 	plane.userData = "Plane";
 	scene.add(plane);
 	
+	//Allow stacking on top of canvas (buttons, inputs, etc.)
+	renderer.domElement.style.position = "absolute";
+	renderer.domElement.style.zIndex = 0;
+	//Every element to be stacked on top the renderer
+	$("#nodeNameInput").appendTo("#renderer");
+	$("#nodeNameInput").css( "zIndex", 2 );
+	$("#nodeNameInput").css( "position", "absolute" );
+	
+	//Setup of animation buttons, and other 
+	ANIMATIONCONTROL.buttonSetup();
+	ANIMATIONCONTROL.positionButtons();
 	hintBox();
+	$("#nodeNameInput").hide();
 	
 	//Auto load anything from session storage
 	if(sessionStorage.getItem('graph')) {
@@ -1811,6 +2327,10 @@ function load(obj) {
 //Autosaving to session storage
 function autoSave() {
 	var obj;
+	
+	if(SELECTED1 != null) {
+		SELECTED1;
+	}
 	
 	for(var i = 0; i < GRAPH.nodes.length; i++) {
 		obj = scene.getObjectById(GRAPH.nodes[i].getId());
@@ -1867,24 +2387,28 @@ function drawNode() {
 }
 function drawEdge() {
 	var intersects = raycaster.intersectObjects( scene.children );
-	if(INTERSECTED != null && INTERSECTED.userData == "Node") {
+	//Check it interesects node
+	if(INTERSECTED !== null && INTERSECTED.userData == "Node") {
+		//Check that there isn't already a node selected
 		if(SELECTED1 == null) {
 			SELECTED1 = INTERSECTED.id;
-		} else {
+			highlightSelection();
+		} 
+		//Node was already selected, deselect it
+		else if(INTERSECTED.id == SELECTED1) {
+			unHighlightSelection();
+			SELECTED1 = null;
+		}
+		//There is already a node selected, and the user is selecting another
+		else {
 			SELECTED2 = INTERSECTED.id;
 			
-			if(SELECTED1 == SELECTED2) {
-				SELECTED1 = SELECTED2 = null;
-			} else {
-				SELECTED1 = scene.getObjectById(SELECTED1, true);
-				SELECTED2 = scene.getObjectById(SELECTED2, true);
-				GRAPHDRAWER.addEdge({selections: [SELECTED1, SELECTED2]});
-					
-				SELECTED1 = SELECTED2 = null;
-			}
+			GRAPHDRAWER.addEdge({selections: [scene.getObjectById(SELECTED1, true), 
+				scene.getObjectById(SELECTED2, true)]});
+			
+			unHighlightSelection(SELECTED1.id);
+			SELECTED1 = SELECTED2 = null;
 		}
-	} else {
-		SELECTED1 = SELECTED2 = null;
 	}
 }
 function deleteNode() {
@@ -1900,20 +2424,29 @@ function deleteEdge() {
 	}
 }
 function contractEdge() {
-	var intersects = raycaster.intersectObjects( scene.children );
-	if(INTERSECTED != null && INTERSECTED.userData == "Node") {
+	var intersects = raycaster.intersectObjects( scene.children );	
+	if(INTERSECTED !== null && INTERSECTED.userData == "Node") {
+		//Check that there isn't already a node selected
 		if(SELECTED1 == null) {
 			SELECTED1 = INTERSECTED.id;
-		} else {
+			highlightSelection();
+		} 
+		//Node was already selected, deselect it
+		else if(INTERSECTED.id == SELECTED1) {
+			unHighlightSelection();
+			SELECTED1 = null;
+		}
+		//There is already a node selected, and the user is selecting another
+		else {
 			SELECTED2 = INTERSECTED.id;
-				
-			if(SELECTED1 != SELECTED2 && GRAPH.findEdge(SELECTED1, SELECTED2) != null) {
+			
+			if(GRAPH.findEdge(SELECTED1, SELECTED2) != null) {
 				EDGECONTRACTION.main(SELECTED1, SELECTED2);
 			} 
+			
+			unHighlightSelection(SELECTED1.id);
 			SELECTED1 = SELECTED2 = null;
 		}
-	} else {
-		SELECTED1 = SELECTED2 = null;
 	}
 }
 function renameNode(x, y) {
@@ -1921,6 +2454,9 @@ function renameNode(x, y) {
 	//Upon submitting, place text in front of node
 	var intersects = raycaster.intersectObjects( scene.children );
 	if(INTERSECTED != null && INTERSECTED.userData == "Node") {
+		console.log(INTERSECTED.position);
+		nodeToBeNamed = INTERSECTED.id;
+		
 		setTimeout(function(){
 			nodeName = true;
 		}, 1000);
@@ -1943,111 +2479,153 @@ function renameNode(x, y) {
 		$("#nodeNameInput").show();
 	}
 }
-function nameNode(name) {
-	GRAPHDRAWER.nameNode(name);
+function nameNode(name, nId) {
+	GRAPHDRAWER.nameNode(name, nId);
 }
 //Naming Node
 function popUpNameInput() {
 	
 }
-	
-	
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////                               ~Modes~                                                                     /////////////////////////////////////
 ///////////////////////////  Clean up of animation, reseting selections made by the user, changing the modes, changing the hint box,  /////////////////////////////////////
 /////////////////////////// and performing graph functions should be done here.                                                       /////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////	
+//Drawing/One-time Graph functions/Submit - should clean and hide animation buttons
+function submitSetMode() {
+	resetSelection();
+	cleanUp();
+	ANIMATIONCONTROL.skipAnimation();
+	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.hideButtons();
+	mode = "submitSetMode";
+}
+function submitSeqMode() {
+	resetSelection();
+	cleanUp();
+	ANIMATIONCONTROL.skipAnimation();
+	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.hideButtons();
+	mode = "submitSeqMode";
+}
 function drawNodeMode() {
 	hintBox("Left Click - Add a node");
-	mode = "drawNode";
 	resetSelection();
-	cleanUpAnimation();
-	cleanUp()
+	cleanUp();
+	ANIMATIONCONTROL.skipAnimation();
+	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.hideButtons();
+	mode = "drawNode";
 }
 function drawEdgeMode() {
 	hintBox("Left click on two node to add an edge between them.");
-	mode = "drawEdge";
 	resetSelection();
-	cleanUpAnimation();
-	cleanUp()
+	cleanUp();
+	ANIMATIONCONTROL.skipAnimation();
+	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.hideButtons();
+	mode = "drawEdge";
 }
 function deleteNodeMode() {
 	hintBox("Left click on a node to delete it.");
-	mode = "deleteNode";
 	resetSelection();
-	cleanUpAnimation();
-	cleanUp()
+	cleanUp();
+	ANIMATIONCONTROL.skipAnimation();
+	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.hideButtons();
+	mode = "deleteNode";
 }
 function deleteEdgeMode() {
 	hintBox("Click on the two nodes the edges connects to delete it.");
-	mode = "deleteEdge";
 	resetSelection();
-	cleanUpAnimation();
-	cleanUp()
+	cleanUp();
+	ANIMATIONCONTROL.skipAnimation();
+	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.hideButtons();
+	mode = "deleteEdge";
 }
 function moveNodeMode() {
 	hintBox("Hold left mouse button on the node to drag it.");
+	resetSelection();
+	ANIMATIONCONTROL.skipAnimation();
+	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.hideButtons();
 	mode = "moveNode";
-	resetSelection();
-	cleanUpAnimation();
-}
-function contractionMode() {
-	hintBox("Select the two nodes to which the edge connects to contract it.");
-	mode = "contractionMode";
-	resetSelection();
-	cleanUpAnimation();
-	cleanUp()
 }
 function renameNodeMode() {
+	resetSelection();
+	cleanUp();
+	ANIMATIONCONTROL.skipAnimation();
+	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.hideButtons();
 	mode = "renameNodeMode";
-	resetSelection();
-	cleanUpAnimation();
-	cleanUp()
-}
-function complementAct() {
-	mode = "complementMode";
-	resetSelection();
-	cleanUpAnimation();
-	cleanUp()
-	COMPLEMENT.main();
 }
 function clearGraphAct() {
-	mode = "clearGraphMode";
 	resetSelection();
-	cleanUpAnimation();
-	cleanUp()
+	cleanUp();
+	ANIMATIONCONTROL.skipAnimation();
 	GRAPHDRAWER.clearGraph();
+	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.hideButtons();
+	mode = "clearGraphMode";
 }
 function printGraphAct() {
-	mode = "printGraphMode";
 	resetSelection();
-	cleanUpAnimation();
-	cleanUp()
+	cleanUp();
 	GRAPH.print();
+	ANIMATIONCONTROL.skipAnimation();
+	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.hideButtons();
+	mode = "printGraphMode";
 }
-function eulerianCycleMode() {
-	mode = "eulerianCycleMode";
+function edgeContractionMode() {
+	hintBox("Select the two nodes to which the edge connects to contract it.");
 	resetSelection();
-	cleanUpAnimation();
-	cleanUp()
-	console.log(EULERIANCYCLE.main());
+	cleanUp();
+	ANIMATIONCONTROL.skipAnimation();
+	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.hideButtons();
+	mode = "edgeContractionMode";
+}
+function complementAct() {
+	resetSelection();
+	cleanUp();
+	ANIMATIONCONTROL.skipAnimation();
+	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.hideButtons();
+	mode = "complementMode";
+	COMPLEMENT.main();
+}
+//Multi-solution Graph Function - should disaply buttons
+function eulerianCycleMode() {
+	resetSelection();
+	cleanUp();
+	ANIMATIONCONTROL.skipAnimation();
+	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.showButtons();
+	ANIMATIONCONTROL.swapButtons();
+	mode = "eulerianCycleMode";
+	EULERIANCYCLE.main();
 }
 	
 //Resets selections
 function resetSelection() {
-	SELECTED1 = SELECTED2 = SELECTIONLIST = SELECTEDEDGE = null;
+	if(SELECTED1 !== null) {
+		unHighlightSelection();
+	}
+	SELECTED1 = SELECTED2 = SELECTEDEDGE = null;
 }
 //All functions that clean up animations,input forms, etc. for sepcific functions should go here. 
-function cleanUpAnimation() {
-	EULERIANCYCLE.resetArrows();
-}
 function cleanUp() {
 	$("#nodeName").val("");
 	$("#nodeNameInput").hide();
 }
-
-
-
+function highlightSelection() {
+	scene.getObjectById(SELECTED1).material.color.setHex( 0xff0000 );
+}
+function unHighlightSelection() {
+	scene.getObjectById(SELECTED1).material.color.setHex( DEFAULT_COLOR );
+}
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////                               ~Animator/Renderer~                                                         /////////////////////////////////////
 ///////////////////////////  Functions called to animate and render go here. Also, anything that needs to be checked constantly go    /////////////////////////////////////
