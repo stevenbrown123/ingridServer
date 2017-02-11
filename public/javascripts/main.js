@@ -37,8 +37,56 @@ const EDGE_WIDTH = 15;
 //Renaming
 var nodeToBeNamed = null;
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////                               ~Utils~                                                                     /////////////////////////////////////
+///////////////////////////  Handles anything that requires parallel processing to speed up the process.                              /////////////////////////////////////           
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////	
+var utils = function() {
+	var setUpMatrix = function() {
+		var matrix = [];
+		
+		for(var i = 0; i < GRAPH.nodes.length; i++) {
+			matrix[GRAPH.nodes[i].getId()] = [];
+			
+			for(var j = 0; j < GRAPH.nodes.length; j++) {
+				matrix[GRAPH.nodes[i].getId()][GRAPH.nodes[j].getId()] = 
+				(GRAPH.findEdge(GRAPH.nodes[i].getId(), GRAPH.nodes[j].getId()) != null);
+			}
+		}
+		
+		for(var i = 0; i < GRAPH.nodes.length; i++) {
+			matrix[GRAPH.nodes[i].getId()][GRAPH.nodes[i].getId()] = null;
+		}
+		
+		return matrix;
+	}
+	
+	var setUpMatrixId = function() {
+		var matrix = [];
+		
+		for(var i = 0; i < GRAPH.nodes.length; i++) {
+			matrix[GRAPH.nodes[i].getId()] = [];
+			
+			for(var j = 0; j < GRAPH.nodes.length; j++) {
+				matrix[GRAPH.nodes[i].getId()][GRAPH.nodes[j].getId()] = 
+					GRAPH.findEdge(GRAPH.nodes[i].getId(), GRAPH.nodes[j].getId());
+			}
+		}
+		
+		for(var i = 0; i < GRAPH.nodes.length; i++) {
+			matrix[GRAPH.nodes[i].getId()][GRAPH.nodes[i].getId()] = null;
+		}
+		
+		return matrix;
+	}
+	
+	return {
+		setUpMatrix: setUpMatrix,
+		setUpMatrixId: setUpMatrixId
+	};
+}
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////                               ~Web Worker Manager~                                                        /////////////////////////////////////
-///////////////////////////  Handles anything that requires parallel processing to speed up the process.                              /////////////////////////////////////                              /////////////////////////////////////
+///////////////////////////  Handles anything that requires parallel processing to speed up the process.                              /////////////////////////////////////           
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////	
 var webWorkerManager = function() {
 	var maxWorkers = navigator.hardwareConcurrency || 4;
@@ -59,7 +107,16 @@ var webWorkerManager = function() {
 	}
 	
 	var workerComm = function(response) {
+		var data = JSON.parse(response.data);
 		
+		if(data.status === "Incomplete") {
+			enlistWebWorker(JSON.stringify({type: data.type, context: data.context}));
+		}
+		else {
+			if(data.type == "EC") {
+				EULERIANCYCLE.checkNewSolution(data.context.circuit);
+			}
+		}
 	}
 	
 	var enlistWebWorker = function(message) {
@@ -72,8 +129,29 @@ var webWorkerManager = function() {
 		return jobCount.indexOf(x);
 	}
 	
+	var restart = function() {
+		for(var i = 0; i < workers.length; i++) {
+			workers[i].terminate();
+		}
+		
+		workers = [];
+		blobs = [];
+		
+		for(var i = 0; i < maxWorkers; i++) {
+			jobCount[i] = 0;
+			blobs.push(new Blob([
+			  document.querySelector('#webWorker').textContent
+			], { type: "text/javascript" }));
+			workers.push(new Worker(window.URL.createObjectURL(blobs[i])));
+			workers[i].onmessage = function(response) {
+				workerComm(response);
+			}
+		}
+	}
+	
 	return {
-		enlistWebWorker: enlistWebWorker
+		enlistWebWorker: enlistWebWorker,
+		restart: restart
 	};
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -197,16 +275,19 @@ var animationControl = function() {
 		}
 	}	
 	
-	var updateCounter = function() {
+	var updateCounter = function(num, length) {
 		if(mode === "eulerianCycleMode") {
-			if(EULERIANCYCLE.solutions === 0){
+			if(length === 0){
 				$("#solution-counter").text("0 solutions");
 			}
 			else {
-				$("#solution-counter").text( (EULERIANCYCLE.currSol+1) + " / " + EULERIANCYCLE.solutions.length);
+				$("#solution-counter").text( (num+1) + " / " + length);
 			}
-			
-		}		
+		}
+	}
+	
+	var clearAllSolutions = function() {
+		EULERIANCYCLE.clearSolutions();
 	}
 	
 	return {
@@ -220,7 +301,8 @@ var animationControl = function() {
 		swapButtons: swapButtons,
 		buttonSetup: buttonSetup,
 		positionButtons: positionButtons,
-		updateCounter: updateCounter
+		updateCounter: updateCounter,
+		clearAllSolutions: clearAllSolutions
 	};
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -550,7 +632,6 @@ var eulerianCycle = function() {
 	var animationParameters = [];
 	
 	var actualIterations; //correction of ITERATIONS
-	var size;
 	var matrix;
 	
 	
@@ -566,8 +647,8 @@ var eulerianCycle = function() {
 			if(!noOddDegrees()) {
 				return false;
 			}
-			size = GRAPH.nodes.length;
-			matrix = setUpMatrix();
+			ANIMATIONCONTROL.swapButtons(true);
+			matrix = UTILS.setUpMatrixId();
 			if(!allNonZeroDegreeConnected()) {
 				return false;
 			}
@@ -575,34 +656,17 @@ var eulerianCycle = function() {
 			//The answer(s)
 			solutions.push(hierholzerAlgorithm());
 			
+			ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
 			animationSetUp();
 		}
 		else {
 			animationSetUp();
 		}
 		
-		ANIMATIONCONTROL.updateCounter().
+		ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
 		return;
 	}
-	//Adjacency matrix
-	var setUpMatrix = function() {
-		ANIMATIONCONTROL.swapButtons(true);
-		var matrix = [];
-		
-		for(var i = 0; i < size; i++) {
-			matrix[GRAPH.nodes[i].getId()] = [];
-			
-			for(var j = 0; j < size; j++) {
-				matrix[GRAPH.nodes[i].getId()][GRAPH.nodes[j].getId()] = (GRAPH.findEdge(GRAPH.nodes[i].getId(), GRAPH.nodes[j].getId()) != null);
-			}
-		}
-		
-		for(var i = 0; i < size; i++) {
-			matrix[GRAPH.nodes[i].getId()][GRAPH.nodes[i].getId()] = null;
-		}
-		
-		return matrix;
-	}
+	
 	//Criteria for eularian cycle
 	var noOddDegrees = function() {
 		for(var i = 0; i < GRAPH.nodes.length; i++) {
@@ -687,46 +751,33 @@ var eulerianCycle = function() {
 	//The actual algorithm
 	var hierholzerAlgorithm = function() {
 		var circuit = [];
-		var unusedEdges = {}; //"id of node" => # of unused edges
+		var unusedEdges = []; //"id of node" => # of unused edges
 		var edgesVisited = new Set();
 		var start;
-		var last;
+		var last = 0;
 				
 		//Grabs first connected node as a start
 		for(var i = 0; GRAPH.nodes.length; i++) {
 			if(GRAPH.nodes[i].getDegree() != 0) {
-				start = GRAPH.nodes[i];
+				start = GRAPH.nodes[i].getId();
 				circuit.push(start);
 				break;
 			}
 		}
 		
-		setUpMessage(circuit, unusuedEdges, edgesVisited, statrt, last)
-		
-		WEBWORKERMANAGER.enlistWebWorker(JSON.stringify({
-			type: "EC",
-			context: {
-				circuit: circuit,
-				unusedEdges: unusedEdges,
-				edgesVisited: Array.from(edgesVisited),
-				start: {
-					
-				},
-				last, last
-			}
-		}));
+		enlistWebWorkers(circuit, unusedEdges, edgesVisited, start, last);
 		
 		while(true) {
 			//Finds first adjacent node to continue path
 			for(var i = 0; i < GRAPH.nodes.length; i++) {
-				if(matrix[start.getId()][GRAPH.nodes[i].getId()] && !circuit.includes(GRAPH.nodes[i])) {
-					circuit.push(GRAPH.nodes[i]);
-					last = GRAPH.nodes[i];
-					unusedEdges[start.getId().toString()] = unusedEdges[start.getId().toString()] === 
-						undefined ? start.getDegree() - 1 : unusedEdges[start.getId().toString()] - 1;
-					unusedEdges[last.getId().toString()] = unusedEdges[last.getId().toString()] === 
-						undefined ? last.getDegree() - 1 : unusedEdges[last.getId().toString()] - 1;
-					edgesVisited.add(GRAPH.findEdge(start.getId(), last.getId()));
+				if(matrix[start][GRAPH.nodes[i].getId()] !== null && !circuit.includes(GRAPH.nodes[i].getId())) {
+					circuit.push(GRAPH.nodes[i].getId());
+					last = GRAPH.nodes[i].getId();
+					unusedEdges[start] = unusedEdges[start] === undefined || unusuedEdges[start] === 
+						null ? GRAPH.findNode(start).getDegree() - 1 : unusedEdges[start] - 1;
+					unusedEdges[last] = unusedEdges[last] === undefined || unusedEdges[last] === 
+						null ? GRAPH.findNode(last).getDegree() - 1 : unusedEdges[last] - 1;
+					edgesVisited.add(GRAPH.findEdge(start, last));
 					break;
 				}
 			}
@@ -735,20 +786,20 @@ var eulerianCycle = function() {
 			while(start !== last) {
 				//Chooses next node, checks if the start is encountered or not
 				for(var i = 0; i < GRAPH.nodes.length; i++) {
-					if(matrix[last.getId()][GRAPH.nodes[i].getId()] && start == GRAPH.nodes[i] && !edgesVisited.has(GRAPH.findEdge(last.getId(), GRAPH.nodes[i].getId()))) {
-						edgesVisited.add(GRAPH.findEdge(last.getId(), GRAPH.nodes[i].getId()));
+					if(matrix[last][GRAPH.nodes[i].getId()] !== null && start === GRAPH.nodes[i].getId() && !edgesVisited.has(GRAPH.findEdge(last, GRAPH.nodes[i].getId()))) {
+						edgesVisited.add(GRAPH.findEdge(last, GRAPH.nodes[i].getId()));
 						last = start;
-						unusedEdges[circuit[circuit.length - 1].getId().toString()]--;
-						unusedEdges[start.getId().toString()]--;
+						unusedEdges[circuit[circuit.length - 1]]--;
+						unusedEdges[start]--;
 						break;
 					}
-					else if(matrix[last.getId()][GRAPH.nodes[i].getId()] && !edgesVisited.has(GRAPH.findEdge(last.getId(), GRAPH.nodes[i].getId()))) {
-						edgesVisited.add(GRAPH.findEdge(last.getId(), GRAPH.nodes[i].getId()));
-						last = GRAPH.nodes[i];
+					else if(matrix[last][GRAPH.nodes[i].getId()] !== null && !edgesVisited.has(GRAPH.findEdge(last, GRAPH.nodes[i].getId()))) {
+						edgesVisited.add(GRAPH.findEdge(last, GRAPH.nodes[i].getId()));
+						last = GRAPH.nodes[i].getId();
 						circuit.push(last);
-						unusedEdges[last.getId().toString()] = unusedEdges[last.getId().toString()] === 
-							undefined ? last.getDegree() - 1 : unusedEdges[last.getId().toString()] - 1;
-						unusedEdges[circuit[circuit.length - 2].getId().toString()]--;
+						unusedEdges[last] = unusedEdges[last] === undefined || unusedEdges[last] ===
+							null ? GRAPH.findNode(last).getDegree() - 1 : unusedEdges[last] - 1;
+						unusedEdges[circuit[circuit.length - 2]]--;
 						break;
 					}
 				}
@@ -758,9 +809,10 @@ var eulerianCycle = function() {
 			
 			//Finds first node with unused edges
 			for(var i = 0; i < GRAPH.nodes.length; i++) {
-				if(unusedEdges[GRAPH.nodes[i].getId().toString()] !== undefined &&
-					unusedEdges[GRAPH.nodes[i].getId().toString()] !== 0) {
-					start = last = GRAPH.nodes[i];
+				if((unusedEdges[GRAPH.nodes[i].getId()] !== undefined || 
+					unusedEdges[GRAPH.nodes[i].getId()] !== null) &&
+					unusedEdges[GRAPH.nodes[i].getId()] !== 0) {
+					start = last = GRAPH.nodes[i].getId();
 					break;
 				}
 			};
@@ -779,17 +831,65 @@ var eulerianCycle = function() {
 		}
 	}
 	
-	var setUpMessage = function() {
+	var enlistWebWorkers = function(circuit, unusedEdges, edgesVisited, start, last) {
+		WEBWORKERMANAGER.enlistWebWorker(JSON.stringify({
+			type: "EC",
+			context: {
+				circuit: circuit,
+				edgesVisited: Array.from(edgesVisited),
+				unusedEdges: unusedEdges,
+				start: start,
+				last: start,
+				matrix: matrix,
+				GRAPH: GRAPH.toStringJ()
+			}
+		}));
+	}
+	
+	var checkNewSolution = function(newSolution) {
+		for(var i = 0; i < solutions.length; i++) {
+			if(rotateSolutionCheck(newSolution, solutions[i])) {
+				return;
+			}
+		}		
 		
+		solutions.push(newSolution);
+		ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
+	}
+	
+	var rotateSolutionCheck = function(newSolution, solution) {
+		for(var i = 0; i < newSolution.length - 1; i++) {
+			newSolution.shift();
+			newSolution.push(newSolution[0]);
+			
+			if(matchSolutions(newSolution, solution)) {
+				return true;
+			}
+		}
+		
+		return false;
+	}
+	
+	var matchSolutions = function(newSolution, solution) {
+		for(var i = 0; i < newSolution.length; i++) {
+			if(newSolution[i] !== solution[i]) {
+				return false;
+			}
+		}
+		return true;
 	}
 	
 	//Animation where the arrows are drawn out incrementally starting with the first edge to the last in the circuit
 	var animationSetUp = function() {
+		if(animationSetUp === -1) {
+			return;
+		}
+		
 		ANIMATIONCONTROL.swapButtons(true);
 		
 		var circuit = [];
 		for(var i = 0; i < solutions[currSol].length; i++) {
-			circuit.push(solutions[currSol][i].getId());
+			circuit.push(solutions[currSol][i]);
 		}
 		
 		var iterationsPerEdge = ITERATIONS/(circuit.length - 1);
@@ -868,9 +968,12 @@ var eulerianCycle = function() {
 		}
 		timeouts = [];
 		cleanUpAnimation();
-		animationComplete(animationParameters[currSol].endPoints,
+		
+		if(currSol !== -1) {
+			animationComplete(animationParameters[currSol].endPoints,
 			animationParameters[currSol].directionVectors,
-			animationParameters[currSol].finalLengths)
+			animationParameters[currSol].finalLengths);
+		}
 	}
 	//Clear the animation
 	var cleanUpAnimation = function(){
@@ -880,20 +983,36 @@ var eulerianCycle = function() {
 		animationObjects = [];
 	}
 	var clearSolutions = function() {
+		currSol = 0;
 		solutions = [];
 	}
 	
 	var nextSolution = function() {
+		if(solutions.length === 0) {
+			return;
+		}
+		
 		cleanUpAnimation();
 		currSol = (currSol + 1)%solutions.length;
 		animationSetUp();
+		ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
 	}
 	var prevSolution = function() {
+		if(solutions.length === 0) {
+			return;
+		}
+		
 		cleanUpAnimation();
 		currSol = ((currSol - 1 >= 0)? currSol - 1 : solutions.length - 1)%solutions.length;
 		animationSetUp();
+		console.log("Inside " + currSol);
+		ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
 	}
 	var replaySolution = function() {
+		if(solutions.length === 0) {
+			return;
+		}
+		
 		cleanUpAnimation();
 		animationSetUp();
 	}
@@ -908,7 +1027,9 @@ var eulerianCycle = function() {
 		cleanUpAnimation: cleanUpAnimation,
 		nextSolution: nextSolution,
 		prevSolution: prevSolution,
-		replaySolution: replaySolution
+		replaySolution: replaySolution,
+		checkNewSolution: checkNewSolution,
+		clearSolutions: clearSolutions
 	}
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -986,6 +1107,18 @@ var Graph = function() {
 		}
 		var decrementDegree = function() {
 			degree--;
+			if(degree < 0) {
+				console.log("Error: A node's degree should not be less than 0!");
+			}
+		}
+		
+		var toStringAlmost = function() {
+			return {
+				id: getId(),
+				color: getColor(),
+				degree: getDegree(),
+				position: position
+			}
 		}
 		
 		return {
@@ -998,7 +1131,8 @@ var Graph = function() {
 			setColor: setColor,
 			setName: setName,
 			incrementDegree: incrementDegree,
-			decrementDegree: decrementDegree
+			decrementDegree: decrementDegree,
+			toStringAlmost, toStringAlmost
 		};
 	}
 	//Edge Object
@@ -1030,15 +1164,6 @@ var Graph = function() {
 			return color;
 		}
 		
-		var setMidPoint = function(mp) {
-			midPoint = mp;
-		}
-		var setLength = function(l) {
-			length = l;
-		}
-		var setRotation = function(r) {
-			rotation = r
-		}
 		var setColor = function(c) {
 			color = c;
 		}
@@ -1063,6 +1188,15 @@ var Graph = function() {
 			midPoint = p;
 		}
 		
+		var toStringAlmost = function() {
+			return {
+				id: getId(),
+				node1: GRAPH.findNode(node1).getId(),
+				node2: GRAPH.findNode(node2).getId(),
+				color: getColor()
+			}
+		}
+		
 		return {
 			getId: getId,
 			getNode1: getNode1,
@@ -1071,13 +1205,11 @@ var Graph = function() {
 			getRotation: getRotation,
 			getLength: getLength,
 			getMidPoint: getMidPoint,
-			setMidPoint: setMidPoint,
-			setLength: setLength,
 			setColor: setColor,
-			setRotation: setRotation,
 			recalculateLength: recalculateLength,
 			recalculateRotation: recalculateRotation,
-			recalculateMidPoint: recalculateMidPoint
+			recalculateMidPoint: recalculateMidPoint,
+			toStringAlmost: toStringAlmost
 		}
 	}
 	//Camera Object
@@ -1099,11 +1231,19 @@ var Graph = function() {
 			zoom = z;
 		}
 		
+		var toStringAlmost = function() {
+			return {
+				position: position,
+				zoom: zoom
+			}
+		}
+		
 		return {
 			getPosition: getPosition,
 			getZoom: getZoom,
 			setPosition: setPosition,
-			setZoom: setZoom
+			setZoom: setZoom,
+			toStringAlmost: toStringAlmost
 		};
 	}
 	//Graph Object
@@ -1112,25 +1252,6 @@ var Graph = function() {
 		var edges = [];
 		
 		var camera = Camera();
-		
-		//For testing purposes
-		var print = function(){
-			var string = "";
-			string += "Nodes: \n";
-			for(var i = 0; i < nodes.length; i++) {
-				string += ["id:", nodes[i].getId(), ""].join(" ");
-				string += ["deg:", nodes[i].getDegree(), ""].join(" ");
-				string += "\n";
-			}
-			string += "Edges: \n";
-			for(var i = 0; i < edges.length; i++) {
-				string += ["id:", edges[i].getId(), ""].join(" ");
-				string += ["node1:", edges[i].getNode1(), ""].join(" ");
-				string += ["node2:", edges[i].getNode2(), ""].join(" ");
-				string += "\n";
-			}
-			console.log(string);
-		};
 				
 		//Requires a unique object id, unique name(if one is provided)
 		var addNode = function(n, name=null) {
@@ -1274,11 +1395,28 @@ var Graph = function() {
 			return edgesFound;
 		};
 		
+		var toStringJ = function() {
+			var n = [];
+			var e = [];
+			
+			for(var i = 0; i < nodes.length; i++) {
+				n.push(nodes[i].toStringAlmost());
+			}
+			for(var i = 0; i < edges.length; i++) {
+				e.push(edges[i].toStringAlmost());
+			}
+			
+			return JSON.stringify({
+				nodes: n,
+				edges: e,
+				camera: camera.toStringAlmost()
+			});
+		}
+		
 		return {
 			nodes: nodes,
 			edges: edges,
 			camera: camera,
-			print: print,
 			addNode: addNode,
 			addEdge: addEdge,
 			removeNode: removeNode,
@@ -1286,7 +1424,8 @@ var Graph = function() {
 			findNode: findNode,
 			findEdge: findEdge,
 			findEdges: findEdges,
-			findEdgeObject: findEdgeObject
+			findEdgeObject: findEdgeObject,
+			toStringJ: toStringJ
 		};
 	}
 	
@@ -1326,7 +1465,7 @@ var graphDrawer = function() {
 
 		if(typeof options.load === "undefined") {
 			geometry = new THREE.CircleBufferGeometry( NODE_RADIUS , 32 );
-			object = new THREE.Mesh( geometry, new THREE.MeshLambertMaterial( { color: DEFAULT_COLOR} ) );
+			object = new THREE.Mesh( geometry, new THREE.MeshLambertMaterial( { color: DEFAULT_COLOR } ) );
 			object.position.x = options.position.x;
 			object.position.y = options.position.y;
 			object.position.z = NODE_LAYER;
@@ -1334,7 +1473,7 @@ var graphDrawer = function() {
 			
 		} else {
 			geometry = new THREE.CircleBufferGeometry( NODE_RADIUS , 32 );
-			object = new THREE.Mesh( geometry, new THREE.MeshLambertMaterial( { color: options.load.color} ) );
+			object = new THREE.Mesh( geometry, new THREE.MeshLambertMaterial( { color: options.load.color } ) );
 			object.position.x = options.load.position.x;
 			object.position.y = options.load.position.y;
 			object.position.z = NODE_LAYER;
@@ -1344,6 +1483,8 @@ var graphDrawer = function() {
 		GRAPH.addNode(object.id);
 		scene.add( object );
 		
+		WEBWORKERMANAGER.restart();
+		ANIMATIONCONTROL.clearAllSolutions();
 		autoSave();
 		return object.id;
 	}
@@ -1401,6 +1542,8 @@ var graphDrawer = function() {
 			cube.position.set(edge.getMidPoint().x, edge.getMidPoint().y, edge.getMidPoint().z);
 			
 			scene.add( cube );
+			WEBWORKERMANAGER.restart();
+			ANIMATIONCONTROL.clearAllSolutions();
 			autoSave();
 		}
 	}
@@ -1408,6 +1551,8 @@ var graphDrawer = function() {
 	var removeNode = function(object) {
 		var list = GRAPH.removeNode(object.id);
 		removeObjects(list);
+		WEBWORKERMANAGER.restart();
+		ANIMATIONCONTROL.clearAllSolutions();
 		autoSave();
 	}
 	//Removes a single edge (sync)
@@ -1415,6 +1560,8 @@ var graphDrawer = function() {
 		var edge = GRAPH.findEdgeObject(eId);
 		var list = GRAPH.removeEdge(edge.getNode1(), edge.getNode2());
 		removeObjects(list);
+		WEBWORKERMANAGER.restart();
+		ANIMATIONCONTROL.clearAllSolutions();
 		autoSave();
 	}
 	//Removes everything (sync)
@@ -1422,6 +1569,8 @@ var graphDrawer = function() {
 		while(GRAPH.nodes.length > 0) {
 			removeNode(scene.getObjectById(GRAPH.nodes[0].getId()));
 		}
+		WEBWORKERMANAGER.restart();
+		ANIMATIONCONTROL.clearAllSolutions();
 		autoSave();
 	}
 	//Actual function to remove the objects from display
@@ -1949,14 +2098,16 @@ var graphParser = function() {
 ///////////////////////////                This is where the actual fun begins                            /////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+var UTILS = utils();
+
 //Animation
-var ANIMATIONCONTROL = new animationControl();
-var WEBWORKERMANAGER = new webWorkerManager();
+var ANIMATIONCONTROL = animationControl();
+var WEBWORKERMANAGER = webWorkerManager();
 
 //Graph
 var GRAPH = Graph();
-var GRAPHDRAWER = new graphDrawer();
-var GRAPHPARSER = new graphParser();
+var GRAPHDRAWER = graphDrawer();
+var GRAPHPARSER = graphParser();
 
 //Graph Functions
 var COMPLEMENT = complement();
@@ -2056,47 +2207,18 @@ $(document).ready(function(){
 	$(".close").click(function() {
 		$("#PDFModal").hide();
 	});
-	$("#save-Link").click(function() {
-		var obj;
-	
+	$("#save-Link").click(function() {		
+		
 		for(var i = 0; i < GRAPH.nodes.length; i++) {
 			obj = scene.getObjectById(GRAPH.nodes[i].getId());
 			GRAPH.nodes[i].setPosition(obj.position);
 			GRAPH.nodes[i].setColor(obj.material.color.getHex());
-		}	
-		
+		}
+			
 		GRAPH.camera.setPosition(camera.position);
 		GRAPH.camera.setZoom(camera.zoom);
-		
-		obj = {};
-		obj.nodes = [];
-		
-		for(var i = 0; i < GRAPH.nodes.length; i++) {
-			obj.nodes.push({id: GRAPH.nodes[i].getId(),
-				position: new THREE.Vector3(Math.round(GRAPH.nodes[i].getPosition().x * 100)/ 100,
-					Math.round(GRAPH.nodes[i].getPosition().y * 100)/ 100,
-					Math.round(GRAPH.nodes[i].getPosition().z * 100)/ 100),
-				color: GRAPH.nodes[i].getColor(),
-				name: GRAPH.nodes[i].getName(),
-				degree: GRAPH.nodes[i].getDegree()});
-		}
-		
-		obj.edges = [];
-		for(var i = 0; i < GRAPH.edges.length; i++) {
-			obj.edges.push({id: GRAPH.edges[i].getId(),
-				node1: GRAPH.edges[i].getNode1(),
-				node2: GRAPH.edges[i].getNode2(),
-				color: GRAPH.nodes[i].getColor()});
-		}
-		
-		obj.camera = {};
-		obj.camera.position = new THREE.Vector3(Math.round(GRAPH.camera.getPosition().x * 100)/ 100, 
-			Math.round(GRAPH.camera.getPosition().y * 100)/ 100,
-			Math.round(GRAPH.camera.getPosition().z * 100)/ 100);
-		obj.camera.zoom = GRAPH.camera.getZoom();
-		
-		var json = JSON.stringify(obj);
-		console.log(json);
+			
+		sessionStorage.setItem('graph', GRAPH.toStringJ());
 		
 		//SOMETHING
 	});
@@ -2306,11 +2428,11 @@ function hintBox(text="") {
 }
 
 //Loading a Graph in
-function load(obj) {
-	obj = JSON.parse(obj);
+function load(str) {
+	var obj = JSON.parse(str);
 	var nodeMap = [];
 	var newId;
-		
+
 	for(var i = 0; i < obj.nodes.length; i++) {
 		newId = GRAPHDRAWER.addNode({load: obj.nodes[i]});
 		nodeMap[obj.nodes[i].id] = newId;
@@ -2328,47 +2450,16 @@ function load(obj) {
 function autoSave() {
 	var obj;
 	
-	if(SELECTED1 != null) {
-		SELECTED1;
-	}
-	
 	for(var i = 0; i < GRAPH.nodes.length; i++) {
 		obj = scene.getObjectById(GRAPH.nodes[i].getId());
 		GRAPH.nodes[i].setPosition(obj.position);
 		GRAPH.nodes[i].setColor(obj.material.color.getHex());
-	}	
+	}
 		
 	GRAPH.camera.setPosition(camera.position);
 	GRAPH.camera.setZoom(camera.zoom);
 		
-	obj = {};
-	obj.nodes = [];
-		
-	for(var i = 0; i < GRAPH.nodes.length; i++) {
-		obj.nodes.push({id: GRAPH.nodes[i].getId(),
-			position: new THREE.Vector3(Math.round(GRAPH.nodes[i].getPosition().x * 100)/ 100,
-				Math.round(GRAPH.nodes[i].getPosition().y * 100)/ 100,
-				Math.round(GRAPH.nodes[i].getPosition().z * 100)/ 100),
-			color: GRAPH.nodes[i].getColor(),
-			name: GRAPH.nodes[i].getName()});
-	}
-		
-	obj.edges = [];
-	for(var i = 0; i < GRAPH.edges.length; i++) {
-		obj.edges.push({id: GRAPH.edges[i].getId(),
-			node1: GRAPH.edges[i].getNode1(),
-			node2: GRAPH.edges[i].getNode2(),
-			color: GRAPH.edges[i].getColor()});
-	}
-		
-	obj.camera = {};
-	obj.camera.position = new THREE.Vector3(Math.round(GRAPH.camera.getPosition().x * 100)/ 100, 
-		Math.round(GRAPH.camera.getPosition().y * 100)/ 100,
-		Math.round(GRAPH.camera.getPosition().z * 100)/ 100);
-	obj.camera.zoom = GRAPH.camera.getZoom();
-		
-	var json = JSON.stringify(obj);
-	sessionStorage.setItem('graph', json);
+	sessionStorage.setItem('graph', GRAPH.toStringJ());
 }
 
 	
