@@ -773,7 +773,7 @@ var eulerianCycle = function() {
 				if(matrix[start][GRAPH.nodes[i].getId()] !== null && !circuit.includes(GRAPH.nodes[i].getId())) {
 					circuit.push(GRAPH.nodes[i].getId());
 					last = GRAPH.nodes[i].getId();
-					unusedEdges[start] = unusedEdges[start] === undefined || unusuedEdges[start] === 
+					unusedEdges[start] = unusedEdges[start] === undefined || unusedEdges[start] === 
 						null ? GRAPH.findNode(start).getDegree() - 1 : unusedEdges[start] - 1;
 					unusedEdges[last] = unusedEdges[last] === undefined || unusedEdges[last] === 
 						null ? GRAPH.findNode(last).getDegree() - 1 : unusedEdges[last] - 1;
@@ -824,8 +824,8 @@ var eulerianCycle = function() {
 			}
 			
 			//Rotates circuit for the new starting node
-			while(start != circuit[0]) {
-				circuit = ciruit.push(circuit.shift());
+			while(start !== circuit[0]) {
+				circuit.push(circuit.shift());
 			}
 			circuit.push(last);
 		}
