@@ -26,6 +26,7 @@ const DEFAULT_EDGE_COLOR = 0x000000;
 const TIME_BT_FRAMES = 1000/60;
 //Shape Locations and Sizes
 const NODE_LAYER = -200;
+const LABEL_LAYER = NODE_LAYER + 1;
 const EDGE_LAYER = NODE_LAYER - 1;
 const ANIMATION_LAYER = EDGE_LAYER - .1;
 const PLANE_LAYER = EDGE_LAYER;
@@ -34,8 +35,9 @@ const PLANE_SIZE = 10000;
 const NODE_RADIUS = 15;
 const CUBE_WIDTH = 5;
 const EDGE_WIDTH = 15;
-//Renaming
+//Naming
 var nodeToBeNamed = null;
+var font;
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////                               ~Utils~                                                                     /////////////////////////////////////
 ///////////////////////////  Handles anything that requires parallel processing to speed up the process.                              /////////////////////////////////////           
@@ -79,9 +81,45 @@ var utils = function() {
 		return matrix;
 	}
 	
+	var createLabel = function(text) {
+		var canvas = document.createElement('canvas');
+		var g = canvas.getContext('2d');
+		var fontsize = 128;		
+		
+		canvas.height = 115;
+		canvas.width = 100;
+		
+		g.font = 'Bold ' + fontsize +'px Arial';
+		g.fillStyle = 'black';
+		g.textAlign = 'center';
+		g.fillText(text, canvas.width/2, canvas.height);
+		
+		while(g.measureText(text).width > canvas.width) {
+			g.clearRect(0, 0, canvas.width, canvas.height);
+			
+			fontsize = fontsize / 2;
+			canvas.height = canvas.height/2;
+			
+			g.font = 'Bold ' + fontsize +'px Arial';
+			g.textAlign = 'center';
+			g.fillText(text, canvas.width/2, canvas.height);
+		}
+		
+		var texture = new THREE.Texture(canvas) 
+		texture.needsUpdate = true;
+		texture.minFilter = THREE.LinearFilter;
+		
+		var myPlane = new THREE.Mesh(new THREE.PlaneGeometry(text.length*20, 20), new THREE.MeshBasicMaterial({transparent: true, map: texture}));
+		myPlane.material.side = THREE.DoubleSide;
+		myPlane.userData = "text";
+		
+		return myPlane;
+	}
+	
 	return {
 		setUpMatrix: setUpMatrix,
-		setUpMatrixId: setUpMatrixId
+		setUpMatrixId: setUpMatrixId,
+		createLabel: createLabel
 	};
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1036,6 +1074,37 @@ var eulerianCycle = function() {
 ///////////                  End Eulerian Cycle                                   //////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////                             ~Hamiltonian~                             //////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+var hamiltonianCycle = function() {
+	const ANIMATION_TIME = 1000;
+	const ITERATIONS = ANIMATION_TIME/TIME_BT_FRAMES;
+	
+	var main = function() {
+		
+	}
+	
+	var animationSetUp = function() {
+		
+	}
+	
+	var animation = function() {
+		
+	}
+	
+	var animationComplete = function() {
+		
+	}
+	
+	return {
+		main: main
+	}
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////                  End Hamiltonian Cycle                                //////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////                This section deals with the actual graph                       /////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1061,8 +1130,6 @@ var eulerianCycle = function() {
 	findNode				  |
 	findEdge				  |
 	findEdges------------------
-	getControlPoints - for purposes of manipulating the edges as bezier curves (SUBJECT FOR DELETION FOR FINAL PRODUCT)
-	setControlPoints - for purposes of manipulating the edges as bezier curves (SUBJECT FOR DELETION FOR FINAL PRODUCT)
 	
 	Todo:
 	Naming nodes
@@ -1071,9 +1138,10 @@ var Graph = function() {
 	//Node Object
 	var Node = function(id) {
 		var position;
-		var color;
-		var name;
+		var color = DEFAULT_COLOR;
+		var name = "";
 		var degree = 0;
+		var labelId = 0;
 		
 		var getId = function() {
 			return id;
@@ -1090,6 +1158,9 @@ var Graph = function() {
 		var getDegree = function() {
 			return degree;
 		}
+		var getLabelId = function() {
+			return labelId;
+		}
 		
 		var setPosition = function(p) {
 			position = p;
@@ -1100,6 +1171,9 @@ var Graph = function() {
 		}
 		var setName = function(n) {
 			name = n;
+		}
+		var setLabelId = function(l) {
+			labelId = l;
 		}
 		
 		var incrementDegree = function() {
@@ -1117,7 +1191,8 @@ var Graph = function() {
 				id: getId(),
 				color: getColor(),
 				degree: getDegree(),
-				position: position
+				position: position,
+				name: name
 			}
 		}
 		
@@ -1127,9 +1202,11 @@ var Graph = function() {
 			getColor: getColor,
 			getName: getName,
 			getDegree: getDegree,
+			getLabelId: getLabelId,
 			setPosition: setPosition,
 			setColor: setColor,
 			setName: setName,
+			setLabelId: setLabelId,
 			incrementDegree: incrementDegree,
 			decrementDegree: decrementDegree,
 			toStringAlmost, toStringAlmost
@@ -1257,9 +1334,52 @@ var Graph = function() {
 		var addNode = function(n, name=null) {
 			
 			nodes.push(Node(n));
-			return true;
 			
+			if(name !== null) {
+				nameNode(n, name);
+			}						
+			return true;
 		};
+		
+		//Name the node only if the name is unique and is different
+		var nameNode = function(nId, name) {
+			if(name === "") {
+				return null;
+			}
+			
+			for(var i = 0; i < nodes.length; i++) {
+				if(nId === nodes[i].getId() && nodes[i].getName !== "" && name === nodes[i].getName()) {
+					return null;
+				}
+				if(nId !== nodes[i].getId() && nodes[i].getName() === name) {
+					return null;
+				}
+			}
+			
+			console.log(name);
+			
+			var node = findNode(nId);
+			
+			if(node.getName() !== "") {
+				scene.remove(scene.getObjectById(node.getLabelId()));
+				console.log(node);
+				node.setName(name);
+			}
+			node.setName(name);
+			node.setLabelId(GRAPHDRAWER.createLabel(name));			
+			return node.getLabelId();
+		}
+		
+		//Removes name and label from scene
+		var removeName = function(nId) {
+			var node = findNode(nId);
+			
+			if(node.getName !== "") {
+				node.setName("");
+				scene.remove(scene.getObjectById(node.getLabelId()));
+				node.setLabelId(0);
+			}
+		}
 		
 		//Requires the node pair be unique, unique object id, rejects self loops
 		var addEdge = function(id, n1, n2) {
@@ -1287,6 +1407,10 @@ var Graph = function() {
 		var removeNode = function(n) {
 			var removeList = [];
 			
+			if(findNode(n).getName() !== "") {
+				removeName(n);
+			}
+			
 			for(var i = 0; i < nodes.length; i++) {
 				if(nodes[i].getId() == n) {
 					nodes.splice(i, 1);
@@ -1299,7 +1423,6 @@ var Graph = function() {
 					break;
 				}
 			}
-			
 			return removeList;
 		};
 		
@@ -1421,6 +1544,8 @@ var Graph = function() {
 			addEdge: addEdge,
 			removeNode: removeNode,
 			removeEdge: removeEdge,
+			nameNode, nameNode,
+			removeName: removeName,
 			findNode: findNode,
 			findEdge: findEdge,
 			findEdges: findEdges,
@@ -1470,18 +1595,24 @@ var graphDrawer = function() {
 			object.position.y = options.position.y;
 			object.position.z = NODE_LAYER;
 			object.userData = "Node";
+			GRAPH.addNode(object.id);
 			
 		} else {
 			geometry = new THREE.CircleBufferGeometry( NODE_RADIUS , 32 );
-			object = new THREE.Mesh( geometry, new THREE.MeshLambertMaterial( { color: options.load.color } ) );
+			object = new THREE.Mesh( geometry, new THREE.MeshLambertMaterial( { color: DEFAULT_COLOR } ) );
 			object.position.x = options.load.position.x;
 			object.position.y = options.load.position.y;
 			object.position.z = NODE_LAYER;
 			object.userData = "Node";
+			GRAPH.addNode(object.id, options.load.name);
 		}
 
-		GRAPH.addNode(object.id);
 		scene.add( object );
+		
+		var label = scene.getObjectById(GRAPH.findNode(object.id).getLabelId());
+		if(label) {
+			label.position.set(object.position.x, object.position.y, LABEL_LAYER);
+		}
 		
 		WEBWORKERMANAGER.restart();
 		ANIMATIONCONTROL.clearAllSolutions();
@@ -1579,47 +1710,29 @@ var graphDrawer = function() {
 			scene.remove(scene.getObjectById(list[i], true));
 		}
 	}
+	
 	var nameNode = function(name, theNodeToBeNamed) {
 		theNodeToBeNamed = scene.getObjectById(theNodeToBeNamed);
-		console.log(theNodeToBeNamed);
+		
+		if(name.length === 0) {
+			GRAPH.removeName(theNodeToBeNamed.id);
+		}
+		else {
+			var id = GRAPH.nameNode(theNodeToBeNamed.id, name);
+			
+			if(id !== null) {
+				var label = scene.getObjectById(id);
+				label.position.set(theNodeToBeNamed.position.x, theNodeToBeNamed.position.y, LABEL_LAYER);
+			}
+		}
+		
+		autoSave();
+	}
 	
-		var bitmap = document.createElement('canvas');
-		var g = bitmap.getContext('2d');
-		
-		bitmap.width = 128;
-		bitmap.height = 128;
-		//g.font = 'Bold 128px Arial';
-		//g.textAlign = "center";
-
-		g.font = 'Bold 128px Arial';
-		g.fillStyle = 'white';
-		g.fillText(name, 0, 128);
-		
-		
-		/*g.font = '20pt Arial';
-		//g.textBaseline = "middle";
-		
-		bitmap.height = 128;
-		bitmap.width = g.measureText(name).width;
-		
-		
-		g.fillStyle = '#fff';
-		g.fillText(name, 0, 128);
-		g.strokeStyle = 'white';
-		g.strokeText(name, 0, 128);*/
-		
-		var texture = new THREE.Texture(bitmap) 
-		texture.needsUpdate = true;
-		texture.minFilter = THREE.LinearFilter;
-		
-		material = new THREE.MeshBasicMaterial({ map : texture, /*transparent: true*/})
-		plane = new THREE.Mesh(new THREE.PlaneGeometry(name.length*20, 20), material);
-		plane.material.side = THREE.DoubleSide;
-		plane.position.set(theNodeToBeNamed.position.x, theNodeToBeNamed.position.y, -200);
-		plane.userData = "text";
-		
-		console.log(plane.position);
-		scene.add(plane);
+	var createLabel = function(name) {
+		var label = UTILS.createLabel(name);
+		scene.add(label);
+		return label.id;
 	}
 	
 	var repositionEdges = function(nodeObj) {
@@ -1650,6 +1763,7 @@ var graphDrawer = function() {
 		removeEdge : removeEdge,
 		clearGraph : clearGraph,
 		nameNode : nameNode,
+		createLabel: createLabel,
 		repositionEdges: repositionEdges
 	};
 }
@@ -1708,7 +1822,6 @@ var graphParser = function() {
 		var strArray = nodeStr.replace(/\s+/,' ').trim();
 		strArray = strArray.split(",");
 		
-		//
 		for(var i = 0; i < strArray.length; i++) {
 			strArray[i] = strArray[i].trim();
 			
@@ -1734,9 +1847,11 @@ var graphParser = function() {
 		//Removes excessive spaces
 		var strArray = edgeStr.replace(/\s+/,' ').trim();
 		
+		console.log(strArray);
+		
 		//Stops on erroneous input
-		if(!edgeSetRegex.test(strArray)) {
-			hintBox("The edge set does follow the correct format.");
+		if(strArray !== "" && !edgeSetRegex.test(strArray)) {
+			hintBox("The edge set does not follow the correct format.");
 			return;
 		}
 		
@@ -2049,6 +2164,9 @@ var graphParser = function() {
 	
 	//Generate intial positons of nodes.
 	var initGraph = function(points, nodeSet, edgeSet) {
+		var label;
+		var obj;
+		
 		var mapNodes = {};
 		var id;
 		var deg;
@@ -2057,6 +2175,14 @@ var graphParser = function() {
 			deg = Math.PI*2/nodeSet.length*i
 			id = GRAPHDRAWER.addNode({position: new THREE.Vector3(Math.cos(deg)*DISTANCEFROMCENTER,
 				Math.sin(deg)*DISTANCEFROMCENTER, NODE_LAYER)});
+			
+			if(nodeSet[i][0] !== "_") {
+				GRAPH.nameNode(id, nodeSet[i]);
+				obj = scene.getObjectById(id);
+				label = scene.getObjectById(GRAPH.findNode(id).getLabelId());
+				label.position.set(obj.position.x, obj.position.y, LABEL_LAYER);
+			}
+			
 			points.push({id: id, m: M, v: new THREE.Vector3(0,0,0), a: new THREE.Vector3(0,0,0)});
 			mapNodes[nodeSet[i]] = id;
 		}
@@ -2307,6 +2433,12 @@ $(document).ready(function(){
 			if(intersects.length > 0 && intersects[0].object.userData == "Node") {
 				controls.enable = false;
 				SELECTED1 = intersects[0].object;
+				SELECTED2 = scene.getObjectById(GRAPH.findNode(SELECTED1.id).getLabelId());
+			}
+			else if(intersects.length > 1 && intersects[1].object.userData == "Node") {
+				controls.enable = false;
+				SELECTED1 = intersects[1].object;
+				SELECTED2 = scene.getObjectById(GRAPH.findNode(SELECTED1.id).getLabelId());
 			}
 		}
 	});
@@ -2316,6 +2448,9 @@ $(document).ready(function(){
 			if(SELECTED1) {
 				var intersects = raycaster.intersectObject( plane );
 				SELECTED1.position.set(intersects[0].point.x, intersects[0].point.y, NODE_LAYER);
+				if(SELECTED2) {
+					SELECTED2.position.set(intersects[0].point.x, intersects[0].point.y, LABEL_LAYER);
+				}
 				
 				GRAPHDRAWER.repositionEdges(SELECTED1);
 			}
@@ -2327,6 +2462,7 @@ $(document).ready(function(){
 				if(mode == "moveNode") {
 				controls.enable = true;
 				SELECTED1 = null;
+				SELECTED2 = null;
 				autoSave();
 			}
 				break;
@@ -2453,7 +2589,7 @@ function autoSave() {
 	for(var i = 0; i < GRAPH.nodes.length; i++) {
 		obj = scene.getObjectById(GRAPH.nodes[i].getId());
 		GRAPH.nodes[i].setPosition(obj.position);
-		GRAPH.nodes[i].setColor(obj.material.color.getHex());
+		GRAPH.nodes[i].setColor(DEFAULT_COLOR);
 	}
 		
 	GRAPH.camera.setPosition(camera.position);
@@ -2735,7 +2871,7 @@ function render() {
 	//Detection and Highlighting (only applicable to object with the Lambert material (cubes and nodes))
 	raycaster.setFromCamera( mouse, camera );
 	var intersects = raycaster.intersectObjects( scene.children );
-	if ( intersects.length > 0  && intersects[ 0 ].object.material.hasOwnProperty('emissive') && intersects[0].userData !== "text") {
+	if ( intersects.length > 0  && intersects[ 0 ].object.material.hasOwnProperty('emissive') && intersects[0].object.userData !== "text") {
 		if ( INTERSECTED != intersects[ 0 ].object ) {
 			if ( INTERSECTED ) {
 				INTERSECTED.material.emissive.setHex( INTERSECTED.currentHex );
@@ -2744,7 +2880,18 @@ function render() {
 			INTERSECTED.currentHex = INTERSECTED.material.emissive.getHex();
 			INTERSECTED.material.emissive.setHex( 0xff0000 );
 		}
-	} else {
+	} 
+	else if(intersects[0].object.userData === "text" && intersects.length > 1 && intersects[ 1 ].object.material.hasOwnProperty('emissive')) {
+		if ( INTERSECTED != intersects[ 1 ].object ) {
+			if ( INTERSECTED ) {
+				INTERSECTED.material.emissive.setHex( INTERSECTED.currentHex );
+			}
+			INTERSECTED = intersects[ 1 ].object;
+			INTERSECTED.currentHex = INTERSECTED.material.emissive.getHex();
+			INTERSECTED.material.emissive.setHex( 0xff0000 );
+		}
+	}
+	else {
 		if ( INTERSECTED ) {
 			INTERSECTED.material.emissive.setHex( INTERSECTED.currentHex );
 		}
