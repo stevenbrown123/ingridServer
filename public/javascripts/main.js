@@ -1045,7 +1045,7 @@ var eulerianCycle = function() {
 		timeouts = [];
 		cleanUpAnimation();
 		
-		if(currSol !== -1) {
+		if(solutions.length !== 0) {
 			animationComplete(animationParameters[currSol].endPoints,
 			animationParameters[currSol].directionVectors,
 			animationParameters[currSol].finalLengths);
