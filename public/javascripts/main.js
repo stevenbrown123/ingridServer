@@ -147,11 +147,14 @@ var webWorkerManager = function() {
 	var workerComm = function(response) {
 		var data = JSON.parse(response.data);
 		
+		console.log(data);
+		
 		if(data.status === "Incomplete") {
+			console.log('going to enlist');
 			enlistWebWorker(JSON.stringify({type: data.type, context: data.context}));
 		}
 		else {
-			if(data.type == "EC") {
+			if(data.type === "EC") {
 				EULERIANCYCLE.checkNewSolution(data.context.circuit);
 			}
 		}
@@ -885,6 +888,8 @@ var eulerianCycle = function() {
 	}
 	
 	var checkNewSolution = function(newSolution) {
+		conole.log(newSolution);
+		
 		for(var i = 0; i < solutions.length; i++) {
 			if(rotateSolutionCheck(newSolution, solutions[i])) {
 				return;
