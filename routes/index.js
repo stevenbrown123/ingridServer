@@ -34,7 +34,10 @@ router.post('/save', function (req, res, next) {
             console.log(err);
             callback(-1);
         }
-        callback(rows.insertId);
+        if(rows)
+            callback(rows.insertId);
+        else
+            res.send("invalid input");
     });
 });
 

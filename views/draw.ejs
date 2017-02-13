@@ -4,6 +4,7 @@
     <title>Drawing INGRID</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+
     <style>
         body {
             font-family: Monospace;
@@ -13,6 +14,21 @@
         #renderer {
             width: 100%;
             height: 75vh;
+            position: relative;
+            border: 1px solid #bcc3c6;
+            border-radius: 2px;
+        }
+        canvas {
+            z-index: 1;
+            padding: 0;
+            margin: auto;
+            display: block;
+            position: absolute;
+            border: 1px solid #bcc3c6;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
         }
         .panel, .flip {
             padding: 5px;
@@ -24,8 +40,10 @@
             display: none;
         }
         #hint {
-            width: 95%;
-            margin: 20px;
+            height: 17vh;
+            border: 1px solid #bcc3c6;
+            border-radius: 2px;
+            overflow-y: auto;
         }
         <!--Modal-->
             .modal {
@@ -59,8 +77,52 @@
             text-decoration: none;
             cursor: pointer;
         }
+        <!--Input Box for naming nodes-->
+            #nodeNameInput {
+                display: none;
+                z-index: 2;
+                position: absolute;
+            }
+        <!--Animation Buttons-->
+            #previous {
+                display: none;
+                z-index: 2;
+                position: absolute;
+            }
+        #next {
+            display: none;
+            z-index: 2;
+            position: absolute;
+        }
+        #replay {
+            display: none;
+            z-index: 2;
+            position: absolute;
+        }
+        #skip {
+            display: none;
+            z-index: 2;
+            position: absolute;
+        }
+        #solution-counter {
+            display: none;
+            z-index: 2;
+            position: absolute;
+            width: 80px;
+            height: 50px;
+            text-align: center;
+            font-size: 20px;
+        }
+        .text-label {
+            color: #fff;
+            font-family: "Fira Mono", Monaco, "Andale Mono", "Lucida Console", "Bitstream Vera Sans Mono", "Courier New", Courier, monospace;
+            margin: -5px 0 0 15px;
+            pointer-events:none;
+        }
     </style>
+
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
 </head>
 <body>
 <!--Navbar-->
@@ -117,20 +179,19 @@
                     <button type="button" class="btn btn-default" onclick="deleteNodeMode()">Delete Node</button>
                     <button type="button" class="btn btn-default" onclick="deleteEdgeMode()">Delete Edge</button>
                     <button type="button" class="btn btn-default" onclick="moveNodeMode()">Move Node</button>
-                    <!--<button type="button" class="btn btn-default" onclick="moveEdgeMode()">Move Edge</button>-->
-                    <!--<button type="button" class="btn btn-default" onclick="renameNodeMode()">Rename Node</button>-->
+                    <button type="button" class="btn btn-default" onclick="renameNodeMode()">Rename Node</button>
                     <button type="button" class="btn btn-default" onclick="clearGraphAct()">Clear Graph</button>
-                    <button type="button" class="btn btn-default" onclick="printGraphAct()">Print Graph</button>
                 </div>
             </div>
             <div class="row">
                 <div class="flip" id="flip-4">Graph Functions</div>
                 <div class="panel" id="panel-4">
-                    <button type="button" class="btn btn-default" onclick="contractionMode()">Edge Contraction</button>
+                    <button type="button" class="btn btn-default" onclick="edgeContractionMode()">Edge Contraction</button>
                     <button type="button" class="btn btn-default" onclick="complementAct()">Complement</button>
                     <button type="button" class="btn btn-default" onclick="">Planarity</button>
                     <button type="button" class="btn btn-default" onclick="eulerianCycleMode()">Eulerian Cycles</button>
-                    <button type="button" class="btn btn-default" onclick="">Hamiltonian Cycles</button>
+                    <button type="button" class="btn btn-default" onclick="hamiltonianCycleMode()">Hamiltonian Cycles</button>
+                    <button type="button" class="btn btn-default" onclick="hamiltonianPathMode()">Hamiltonian Paths</button>
                     <button type="button" class="btn btn-default" onclick="">Graph Coloring</button>
                 </div>
             </div>
@@ -147,7 +208,7 @@
 </div>
 
 <!--Modal to give options for the PDF-->
-<div id="PDFModal" class="modal"  class="modal fade" role="dialog">
+<div id="PDFModal" class="modal" class="modal fade" role="dialog">
 
     <div class="modal-content">
         <div class="modal-header">
@@ -169,22 +230,333 @@
             </form>
         </div>
     </div>
-
 </div>
 
-<script src="../javascripts/edgeContraction.js"></script>
-<script src="../javascripts/complement.js"></script>
-<script src="../javascripts/eulerianCycle.js"></script>
+<!--Input Field for naming nodes-->
+<div class="form-group col-xs-1" id="nodeNameInput">
+    <input type="text" class="form-control" id="nodeName">
+</div>
 
-<script src="../javascripts/graph.js"></script>
-<script src="../javascripts/graphDrawer.js"></script>
-<script src="../javascripts/autograph.js"></script>
+
+<!--Buttons dealing with animation-->
+<button type="button" class="btn btn-default" id="previous" onclick="ANIMATIONCONTROL.prevAnimation()"><i
+            class="material-icons">navigate_before</i></button>
+<button type="button" class="btn btn-default" id="next" onclick="ANIMATIONCONTROL.nextAnimation()"><i
+            class="material-icons">navigate_next</i></button>
+<button type="button" class="btn btn-default" id="skip" onclick="ANIMATIONCONTROL.skipAnimation()"><i
+            class="material-icons">skip_next</i></button>
+<button type="button" class="btn btn-default" id="replay" onclick="ANIMATIONCONTROL.replayAnimation()"><i
+            class="material-icons">replay</i></button>
+<p id="solution-counter"></p>
+
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r83/three.js"></script>
 <script src="../javascripts/OrbitControls.js"></script>
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/1.3.2/jspdf.debug.js"></script>
+
+<script id="webWorker" type="javascript/worker">
+			self.onmessage = function(e) {
+				obj = JSON.parse(e.data);
+
+				console.log(obj);
+
+				var firstOpportunity = false;
+				var newContext = {};
+
+				if(obj.type === "EC") {
+					obj = obj.context;
+
+					var circuit = obj.circuit.slice();
+					var edgesVisited = obj.edgesVisited.slice();
+					var matrix = obj.matrix;
+					var unusedEdges = obj.unusedEdges.slice();
+					var start = obj.start;
+					var last = obj.last;
+					var GRAPH = JSON.parse(obj.GRAPH);
+
+					while(true) {
+						//Finds first adjacent node to continue path
+						if(start === last) {
+							for(var i = 0; i < GRAPH.nodes.length; i++) {
+								if(matrix[start][GRAPH.nodes[i].id] !== null && !circuit.includes(GRAPH.nodes[i].id)) {
+									if(firstOpportunity === false) {
+										circuit.push(GRAPH.nodes[i].id);
+										last = GRAPH.nodes[i].id;
+										unusedEdges[start] = unusedEdges[start] === undefined || unusedEdges[start] ===
+											null ? GRAPH.nodes[findIndexOfNode(GRAPH.nodes, start)].degree - 1 : unusedEdges[start] - 1;
+										unusedEdges[last] = unusedEdges[last] === undefined || unusedEdges[last] ===
+											null ? GRAPH.nodes[findIndexOfNode(GRAPH.nodes, last)].degree - 1 : unusedEdges[last] - 1;
+										edgesVisited.push(matrix[start][last]);
+										firstOpportunity = true;
+									}
+									else {
+										newContext = copyECContext(obj);
+										newContext.circuit.push(GRAPH.nodes[i].id);
+										newContext.last = GRAPH.nodes[i].id;
+										newContext.unusedEdges[newContext.start] = newContext.unusedEdges[start] === undefined || newContext.unusedEdges[newContext.start] ===
+											null ? GRAPH.nodes[findIndexOfNode(GRAPH.nodes,newContext.start)].degree - 1 : newContext.unusedEdges[newContext.start] - 1;
+										newContext.unusedEdges[newContext.last] = newContext.unusedEdges[newContext.last] === undefined || newContext.unusedEdges[newContext.last] ===
+											null ? GRAPH.nodes[findIndexOfNode(GRAPH.nodes,newContext.last)].degree - 1 : newContext.unusedEdges[newContext.last] - 1;
+										newContext.edgesVisited.push(matrix[newContext.start][newContext.last]);
+
+										self.postMessage(ECReport(newContext, "Incomplete"));
+									}
+								}
+							}
+
+							firstOpportunity = false;
+						}
+
+						obj = updateECContext({circuit, edgesVisited, matrix, unusedEdges, start, last});
+
+						//Builds path until start node is encountered
+						while(start !== last) {
+							//Chooses next node, checks if the start is encountered or not
+							for(var i = 0; i < GRAPH.nodes.length; i++) {
+								if(matrix[last][GRAPH.nodes[i].id] !== null && start === GRAPH.nodes[i].id && !edgesVisited.includes(matrix[last][GRAPH.nodes[i].id])) {
+									if(firstOpportunity === false) {
+										edgesVisited.push(matrix[last][GRAPH.nodes[i].id]);
+										last = start;
+										unusedEdges[circuit[circuit.length - 1]]--;
+										unusedEdges[start]--;
+										firstOpporunity = true;
+									}
+									else {
+										newContext = copyECContext(obj);
+										newContext.edgesVisited.add(matrix[newContext.last][GRAPH.nodes[i].id]);
+										newContext.last = newContext.start;
+										newContext.unusedEdges[circuit[circuit.length - 1]]--;
+										newContext.unusedEdges[newContext.start]--;
+									}
+								}
+								else if(matrix[last][GRAPH.nodes[i].id] !== null && !edgesVisited.includes(matrix[last][GRAPH.nodes[i].id])) {
+									if(firstOpportunity === false) {
+										edgesVisited.push(matrix[last][GRAPH.nodes[i].id]);
+										last = GRAPH.nodes[i].id;
+										circuit.push(last);
+										unusedEdges[last] = unusedEdges[last] === undefined || unusedEdges[last] ===
+											null ? GRAPH.nodes[findIndexOfNode(GRAPH.nodes, last)].degree - 1 : unusedEdges[last] - 1;
+										unusedEdges[circuit[circuit.length - 2]]--;
+										firstOpporunity = true;
+									}
+									else {
+										newContext = copyECContext(obj);
+										newContext.edgesVisited.push(matrix[newContext.last][GRAPH.nodes[i].id]);
+										newContext.last = GRAPH.nodes[i].id;
+										newContext.circuit.push(newContext.last);
+										newContext.unusedEdges[newContext.last] = newContext.unusedEdges[newContext.last] === undefined || newContext.unusedEdges[newContext.last] ===
+											null ? GRAPH.nodes[findIndexOfNode(GRAPH.nodes, newContext.last)].degree - 1 : newContext.unusedEdges[newContext.last] - 1;
+										newContext.unusedEdges[circuit[circuit.length - 2]]--;
+
+										self.postMessage(ECReport(newContext, "Incomplete"));
+									}
+								}
+
+								firstOpportunity = false;
+								obj = updateECContext({circuit, edgesVisited, matrix, unusedEdges, start, last});
+							}
+						}
+
+						start = null;
+
+						//Finds first node with unused edges
+						for(var i = 0; i < GRAPH.nodes.length; i++) {
+							if((unusedEdges[GRAPH.nodes[i].id] !== undefined ||
+								unusedEdges[GRAPH.nodes[i].id] !== null) &&
+								unusedEdges[GRAPH.nodes[i].id] !== 0) {
+								if(firstOpportunity === false) {
+									start = last = GRAPH.nodes[i].id;
+								}
+								else {
+									newContext = copyECContext(obj);
+									newContext.start = newContext.last = GRAPH.nodes[i].id;
+
+									self.postMessage(ECReport(newContext, "Incomplete"));
+								}
+							}
+						};
+
+						falseOpportunity = false;
+						obj = updateECContext({circuit, edgesVisited, matrix, unusedEdges, start, last});
+
+						//This is the eulerian circuit
+						if(start === null) {
+							circuit.push(last);
+							obj = updateECContext({circuit, edgesVisited, matrix, unusedEdges, start, last});
+							self.postMessage(ECReport(obj,"Complete"));
+							return;
+						}
+
+						//Rotates circuit for the new starting node
+						while(start != circuit[0]) {
+							circuit.push(circuit.shift());
+						}
+						circuit.push(last);
+						obj = updateECContext({circuit, edgesVisited, matrix, unusedEdges, start, last});
+
+						console.log(obj);
+
+						if(circuit.length > GRAPH.nodes.length) {
+							break;
+						}
+					}
+				}
+				else if(obj.type === "HC") {
+					obj = obj.context;
+
+					var circuit = obj.circuit.slice();
+					var nodesVisited = obj.nodesVisited.slice();
+					var matrix = obj.matrix;
+					var GRAPH = JSON.parse(obj.GRAPH);
+
+					if(circuit.length === 0) {
+						for(var i = 0; i < GRAPH.nodes.length; i++) {
+							newContext = copyHCContext(obj);
+							newContext.circuit.push(GRAPH.nodes[i].id);
+							newContext.nodesVisited.push(GRAPH.nodes[i].id);
+
+							self.postMessage(HCReport(newContext, "Incomplete"));
+						}
+					}
+					else {
+						if(nodesVisited.length === GRAPH.nodes.length) {
+							if(matrix[circuit[0]][circuit[circuit.length - 1]] !== null){
+								newContext = copyHCContext(obj);
+								self.postMessage(HCReport(newContext, "Complete"));
+							}
+						}
+						else {
+							for(var i = 0; i < GRAPH.nodes.length; i++) {
+								if(matrix[circuit[circuit.length - 1]][GRAPH.nodes[i].id] !== null &&
+								!nodesVisited.includes(GRAPH.nodes[i].id)) {
+									newContext = copyHCContext(obj);
+									newContext.circuit.push(GRAPH.nodes[i].id);
+									newContext.nodesVisited.push(GRAPH.nodes[i].id);
+
+									self.postMessage(HCReport(newContext, "Incomplete"));
+								}
+							}
+						}
+					}
+				}
+				else if(obj.type === "HP") {
+					obj = obj.context;
+
+					var path = obj.path.slice();
+					var nodesVisited = obj.nodesVisited.slice();
+					var matrix = obj.matrix;
+					var GRAPH = JSON.parse(obj.GRAPH);
+
+					if(path.length === 0) {
+						for(var i = 0; i < GRAPH.nodes.length; i++) {
+							newContext = copyHPContext(obj);
+							newContext.path.push(GRAPH.nodes[i].id);
+							newContext.nodesVisited.push(GRAPH.nodes[i].id);
+
+							self.postMessage(HPReport(newContext, "Incomplete"));
+						}
+					}
+					else {
+						if(nodesVisited.length === GRAPH.nodes.length) {
+							newContext = copyHPContext(obj);
+							self.postMessage(HPReport(newContext, "Complete"));
+						}
+						else {
+							for(var i = 0; i < GRAPH.nodes.length; i++) {
+								if(matrix[path[path.length - 1]][GRAPH.nodes[i].id] !== null &&
+								!nodesVisited.includes(GRAPH.nodes[i].id)) {
+									newContext = copyHPContext(obj);
+									newContext.path.push(GRAPH.nodes[i].id);
+									newContext.nodesVisited.push(GRAPH.nodes[i].id);
+
+									self.postMessage(HPReport(newContext, "Incomplete"));
+								}
+							}
+						}
+					}
+				}
+			}
+
+			function copyECContext(obj) {
+				return {
+					circuit: obj.circuit.slice(),
+					edgesVisited: obj.edgesVisited.slice(),
+					unusedEdges: obj.unusedEdges.slice(),
+					start: obj.start,
+					last:  obj.last,
+					matrix: obj.matrix,
+					GRAPH: obj.GRAPH
+				};
+			}
+
+			function copyHCContext(obj) {
+				return {
+					circuit: obj.circuit.slice(),
+					nodesVisited: obj.nodesVisited.slice(),
+					matrix: obj.matrix,
+					GRAPH: obj.GRAPH,
+				};
+			}
+
+			function copyHPContext(obj) {
+				return {
+					path: obj.path.slice(),
+					nodesVisited: obj.nodesVisited.slice(),
+					matrix: obj.matrix,
+					GRAPH: obj.GRAPH,
+				};
+			}
+
+			function updateECContext(obj) {
+				return {
+					circuit: obj.circuit.slice(),
+					edgesVisited: obj.edgesVisited.slice(),
+					unusedEdges: obj.unusedEdges.slice(),
+					start:  obj.start,
+					last:  obj.last,
+					matrix: obj.matrix,
+					GRAPH: obj.GRAPH
+				};
+			}
+
+			function ECReport(context, status) {
+				return JSON.stringify({
+					type: "EC",
+					context: context,
+					status: status
+				});
+			}
+
+			function HCReport(context, status) {
+				return JSON.stringify({
+					type: "HC",
+					context: context,
+					status: status
+				});
+			}
+
+			function HPReport(context, status) {
+				return JSON.stringify({
+					type: "HP",
+					context: context,
+					status: status
+				});
+			}
+
+			function findIndexOfNode(nodes, id) {
+
+				for(var i = 0; i < nodes.length; i++) {
+					if(id == nodes[i].id) {
+						return i;
+					}
+				}
+
+				return null;
+			}
+
+</script>
 
 <script src="../javascripts/main.js"></script>
 
