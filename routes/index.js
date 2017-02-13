@@ -1,7 +1,7 @@
 var express = require('express');
 var router = express.Router();
-var mysql = require("mysql");
-var con = require("../database.js").connection;
+//var mysql = require("mysql");
+//var con = require("../database.js").connection;
 var request = require('request');
 
 router.get('/', function (req, res, next) {
