@@ -38,6 +38,18 @@ const EDGE_WIDTH = 15;
 //Naming
 var nodeToBeNamed = null;
 var font;
+
+
+
+//Just what kind of bullshit where Javascript has a set object, but does not implement set functions???
+Set.prototype.difference = function(setB) {
+    var difference = new Set(this);
+    for (var elem of setB) {
+        difference.delete(elem);
+    }
+    return difference;
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////                               ~Utils~                                                                     /////////////////////////////////////
 ///////////////////////////  Handles anything that requires parallel processing to speed up the process.                              /////////////////////////////////////           
@@ -81,7 +93,7 @@ var utils = function() {
 		return matrix;
 	}
 	
-	var createLabel = function(text) {
+	var createLabel = function(text, color='black') {
 		var canvas = document.createElement('canvas');
 		var g = canvas.getContext('2d');
 		var fontsize = 128;		
@@ -90,7 +102,7 @@ var utils = function() {
 		canvas.width = 100;
 		
 		g.font = 'Bold ' + fontsize +'px Arial';
-		g.fillStyle = 'black';
+		g.fillStyle = color;
 		g.textAlign = 'center';
 		g.fillText(text, canvas.width/2, canvas.height);
 		
@@ -133,6 +145,12 @@ var webWorkerManager = function() {
 	var workers = [];
 	var jobCount = [];
 	
+	var interval = null;
+	var dots = 0;
+	const MAX_DOTS = 4;
+	const DEC_COUNTER = 3.00;
+	var worked = false;
+	
 	for(var i = 0; i < maxWorkers; i++) {
 		jobCount[i] = 0;
 		blobs.push(new Blob([
@@ -146,11 +164,9 @@ var webWorkerManager = function() {
 	
 	var workerComm = function(response) {
 		var data = JSON.parse(response.data);
-		
-		console.log(data);
+		worked = true;
 		
 		if(data.status === "Incomplete") {
-			console.log('going to enlist');
 			enlistWebWorker(JSON.stringify({type: data.type, context: data.context}));
 		}
 		else {
@@ -163,13 +179,20 @@ var webWorkerManager = function() {
 			else if(data.type === "HP") {
 				HAMILTONIANPATH.addNewSolution(data.context.path);
 			}
+			else if(data.type === "GC") {
+				GRAPHCOLOR.checkNewSolution(data.context.nodeColors);
+			}
 		}
 	}
 	
 	var enlistWebWorker = function(message) {
+		if(interval === null) {
+			interval = setInterval(checkWorking, 250);
+		}
+		
 		var assigned = leastOccupiedWorker();
-		console.log(assigned);
 		jobCount[assigned]++;
+		worked = true;
 		workers[assigned].postMessage(message);
 	}
 	
@@ -186,6 +209,11 @@ var webWorkerManager = function() {
 		workers = [];
 		blobs = [];
 		
+		doneWorking();
+		clearInterval(interval);
+		interval = null;
+		worked = false;
+		
 		for(var i = 0; i < maxWorkers; i++) {
 			jobCount[i] = 0;
 			blobs.push(new Blob([
@@ -196,6 +224,39 @@ var webWorkerManager = function() {
 				workerComm(response);
 			}
 		}
+	}
+	
+	var checkWorking = function() {
+		if(worked === true) {
+			worked = false;
+			doWorking();
+		}
+		else {
+			doneWorking();
+			clearInterval(interval);
+			interval = null;
+			worked = false;
+		}
+	}
+	
+	var doWorking = function() {
+		dots = (dots + 1) % MAX_DOTS;
+		if(dots === 0){
+			HINTBOX.setWorkingOnMessage("Still working");
+		}
+		else if(dots === 1) {
+			HINTBOX.setWorkingOnMessage("Still working.");
+		}
+		else if(dots === 2) {
+			HINTBOX.setWorkingOnMessage("Still working..");
+		}
+		else {
+			HINTBOX.setWorkingOnMessage("Still working...");
+		}
+	}
+	
+	var doneWorking = function() {
+		HINTBOX.setWorkingOnMessage("");
 	}
 	
 	return {
@@ -210,6 +271,13 @@ var webWorkerManager = function() {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////	
 var animationControl = function() {
 	const MARGIN = 20;
+	const MAX_COLOR = 20;
+	var colorNumber = 0;
+	
+	var colors = [ 0xff0000, 0x00ff00, 0x0000ff, 0xffe900, 0xff9900,
+					0x9800ff, 0xff009d, 0x00faff, 0x00ffb6, 0x50ff00,
+					0xffffff, 0xba9b71, 0x754317, 0x8b57e0, 0xceafff,
+					0xf79688, 0xff6dc2, 0x8e5f00, 0x00ff33, 0xfc9cfa];
 	
 	var skipAnimation = function() {		
 		if(mode === "complementMode") {
@@ -238,6 +306,9 @@ var animationControl = function() {
 		else if(mode === "hamiltonianPathMode") {
 			HAMILTONIANPATH.nextSolution();
 		}
+		else if(mode === "graphColorMode") {
+			GRAPHCOLOR.nextSolution();
+		}
 	}
 	var prevAnimation = function() {
 		if(mode === "eulerianCycleMode") {
@@ -248,6 +319,9 @@ var animationControl = function() {
 		}
 		else if(mode === "hamiltonianPathMode") {
 			HAMILTONIANPATH.prevSolution();
+		}
+		else if(mode === "graphColorMode") {
+			GRAPHCOLOR.prevSolution();
 		}
 	}
 	var replayAnimation = function() {
@@ -272,6 +346,15 @@ var animationControl = function() {
 		else if(mode === "hamiltonianPathMode") {
 			HAMILTONIANPATH.cleanUpAnimation();
 		}
+		else if(mode === "graphColorMode") {
+			GRAPHCOLOR.decolorNodes();
+		}
+	}
+	var showPreSelectButton = function() {
+		$("#go").show();
+	}
+	var hidePreSelectButton = function() {
+		$("#go").hide();
 	}
 	var showButtons = function() {
 		$("#previous").show();
@@ -280,6 +363,50 @@ var animationControl = function() {
 		$("#skip").show();
 		$("#solution-counter").show();
 	}
+	var showColorPicker = function() {
+		$("#color-picker").show();
+	}
+	var hideColorPicker = function() {
+		$("#color-picker").hide();
+	}
+	var nextColor = function() {
+		colorNumber = (colorNumber + 1) % MAX_COLOR;
+		updateColorCounter(colorNumber);
+	}
+	var go = function() {
+		if(mode === "graphColorMode") {
+			GRAPHCOLOR.main();
+		}
+		else if(mode === "hamiltonianPathMode") {
+			HAMILTONIANPATH.main();
+		}
+		else if(mode === "hamiltonianCycleMode") {
+			HAMILTONIANCYCLE.main();
+		}
+	}	
+	var prevColor = function() {
+		colorNumber = colorNumber - 1;
+		colorNumber = (colorNumber < 0) ? MAX_COLOR - 1 : colorNumber;
+		updateColorCounter(colorNumber);
+	}
+	var updateColorCounter = function(num) {
+		$("#color-counter").text("Color #" + (num+1) + ":");
+		
+		$("#custom").spectrum("set", toCorrectHexString((colors[colorNumber]).toString(16)));
+	}
+	var toCorrectHexString = function(color) {
+		while(color.length < 6) {
+			color = "0" + color;
+		}
+		
+		return color;
+	}
+	
+	var changeColor = function(color) {
+		colors[colorNumber] = color;
+		GRAPHCOLOR.clearSolutions();;
+	}
+	
 	var hideButtons = function() {
 		$("#previous").hide();
 		$("#next").hide();
@@ -302,7 +429,6 @@ var animationControl = function() {
 		$("#previous").css( "zIndex", 2 );
 		$("#previous").css( "position", "absolute" );
 		
-		
 		$("#replay").appendTo("#renderer");
 		$("#replay").css( "zIndex", 2 );
 		$("#replay").css( "position", "absolute" );
@@ -322,14 +448,25 @@ var animationControl = function() {
 		$("#solution-counter").css( "zIndex", 2 );
 		$("#solution-counter").css( "position", "absolute" );
 		
+		$("#color-picker").appendTo("#renderer");
+		$("#color-picker").css( "zIndex", 2 );
+		$("#color-picker").css( "position", "absolute" );
+		
+		$("#go").appendTo("#renderer");
+		$("#go").css( "zIndex", 2 );
+		$("#go").css( "position", "absolute" );
+		
 		$("#previous").hide();
 		$("#replay").hide();
 		$("#next").hide();
 		$("#skip").hide();
 		$("#solution-counter").hide();
+		$("#color-picker").hide();
+		$("#go").hide();
 	}
 	var positionButtons = function() {
 		showButtons();
+		showColorPicker();
 		$("#previous").css("top", $("#renderer").height() - $("#previous").height()*2);
 		$("#previous").css("left", MARGIN );
 		
@@ -345,17 +482,40 @@ var animationControl = function() {
 		$("#solution-counter").css("top", $("#previous").position().top);
 		$("#solution-counter").css("left", $("#next").position().left + $("#next").width()*2 + MARGIN);
 		
-		if(mode !== "eulerianCycleMode") {
+		$("#custom").spectrum({
+			color: "#f00",
+			change: function(color) {
+				changeColor(parseInt((color.toHexString()).replace(/^#/, ''), 16));
+			}
+		});
+		
+		$("#color-picker").css("top",  $("#renderer").height() - $("#color-picker").height() - MARGIN);
+		$("#color-picker").css("left", $("#renderer").width() - $("#color-picker").width() - MARGIN*2);
+		
+		$("#go").css( "top", $("#previous").position().top );
+		$("#go").css( "left", $("#renderer").width() - $("#go").width() - MARGIN*2 );
+		
+		if(mode !== "eulerianCycleMode"
+		&& mode !== "hamiltonianCycleMode"
+		&& mode !== "hamiltonianPathMode"
+		&& mode !== "graphColorMode") {
 			hideButtons();
 		}
-		else {
-			swapButtons();
+		if(mode !== "graphColorMode") {
+			hideColorPicker();
+		}
+		if(mode !== "hamiltonianPathMode"
+		&& mode !== "hamiltonianCycleMode") {
+			hidePreSelectButton();
 		}
 	}	
 	
 	var updateCounter = function(num, length) {
 		if(length === 0){
 			$("#solution-counter").text("0 solutions");
+		}
+		else if(num === undefined) {
+			$("#solution-counter").text("")
 		}
 		else {
 			$("#solution-counter").text( (num+1) + " / " + length);
@@ -366,9 +526,13 @@ var animationControl = function() {
 		EULERIANCYCLE.clearSolutions();
 		HAMILTONIANCYCLE.clearSolutions();
 		HAMILTONIANPATH.clearSolutions();
+		GRAPHCOLOR.clearSolutions();
 	}
 	
 	return {
+		colors: colors,
+		
+		go: go,
 		nextAnimation: nextAnimation,
 		prevAnimation: prevAnimation,
 		replayAnimation: replayAnimation,
@@ -376,6 +540,12 @@ var animationControl = function() {
 		cleanUpAnimation: cleanUpAnimation,
 		showButtons: showButtons,
 		hideButtons: hideButtons,
+		showColorPicker: showColorPicker,
+		hideColorPicker: hideColorPicker,
+		showPreSelectButton: showPreSelectButton,
+		hidePreSelectButton: hidePreSelectButton,
+		prevColor: prevColor,
+		nextColor: nextColor,
 		swapButtons: swapButtons,
 		buttonSetup: buttonSetup,
 		positionButtons: positionButtons,
@@ -385,6 +555,52 @@ var animationControl = function() {
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////                This section deals with graph functions                        /////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////                               ~Hint Box~                                                                  /////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+var hintBox = function() {
+	var errorMessage = "";
+	var workingOnMessage = "";
+	var modeMessage = "";
+	var formatMessage = "";
+	const generalMessage = "Ctrl + Q - resets the camera view<br/>" +
+		"Hold Down Right Mouse Button - Pan<br/>Scroll - Zoom In/Out<br/>";
+	
+	var setErrorMessage = function(str) {
+		errorMessage = str;
+		outPutMessage();
+	}
+	var setFormatMessage = function(str) {
+		formatMessage =
+		outPutMessage();
+	}
+	var setWorkingOnMessage = function(str) {
+		workingOnMessage = str;
+		outPutMessage();
+	}
+	var setModeMessage = function(str) {
+		modeMessage = str;
+		outPutMessage();
+	}
+	
+	var outPutMessage =function() {
+		$("#hint").html((errorMessage.length !== 0 ? errorMessage + "<br/>" : "") + 
+			(formatMessage.length !== 0 ? formatMessage + "<br/>" : "") +
+			(workingOnMessage.length !== 0 ? workingOnMessage + "<br/>" : "") + 
+			(modeMessage.length !== 0 ? modeMessage + "<br/>" : "") + generalMessage);
+	}
+	
+	return {
+		setErrorMessage: setErrorMessage,
+		setWorkingOnMessage: setWorkingOnMessage,
+		setModeMessage: setModeMessage,
+		setFormatMessage: setFormatMessage
+	};
+}
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////                               ~End Hint Box~                                                              /////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -558,7 +774,6 @@ var edgeContraction = function() {
 
 	//Visually outputs teh result
 	var main = function(n1, n2) {
-		doing = true;
 		node1 = scene.getObjectById(n1);
 		node2 = scene.getObjectById(n2);
 		
@@ -616,6 +831,7 @@ var edgeContraction = function() {
 		node.position.set(vector.x, vector.y, NODE_LAYER);
 		
 		GRAPHDRAWER.repositionEdges(node);
+		doing = false;
 	}
 	//Updates the actual graph
 	var updateGraph = function(n1, n2, vector) {
@@ -657,6 +873,10 @@ var edgeContraction = function() {
 	}
 	
 	var skipAnimation = function() {
+		if(doing === false) {
+			return;
+		}
+		
 		for (var i = 0; i < timeouts.length; i++) {
 			clearTimeout(timeouts[i]);
 		}
@@ -687,9 +907,6 @@ var edgeContraction = function() {
 	Public Methods:
 	main - visually outputs the answer
 	resetArrows - cleans up the drawing
-	
-	Todo:
-	Fix skip
 */
 var eulerianCycle = function() {
 	const ANIMATION_TIME = 2000;
@@ -698,6 +915,8 @@ var eulerianCycle = function() {
 	const ARROW_LAYER = 0; //Keep at this value, it won't appear otherwise
 	const HEAD_LENGTH = 20;
 	const HEAD_WIDTH = 10;
+	const ORDER_TEXT_COLOR = 'white';
+	const ORDER_TEXT_DISTANCE_Y = 45;
 	
 	var doing = false;
 	
@@ -705,6 +924,7 @@ var eulerianCycle = function() {
 	var solutions = [];
 	var currSol = 0;
 	var animationObjects = [];
+	var orderTexts = [];
 	var animationParameters = [];
 	
 	var actualIterations; //correction of ITERATIONS
@@ -715,6 +935,9 @@ var eulerianCycle = function() {
 	//Visually outputs answer
 	var main = function() {
 		if(solutions.length === 0) {
+			
+			ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
+			
 			//Checks all qualifiying criteria
 			if(GRAPH.edges.length == 0) {
 				return [];
@@ -722,8 +945,9 @@ var eulerianCycle = function() {
 			if(!noOddDegrees()) {
 				return false;
 			}
-			ANIMATIONCONTROL.swapButtons(true);
+			
 			matrix = UTILS.setUpMatrixId();
+			
 			if(!allNonZeroDegreeConnected()) {
 				return false;
 			}
@@ -921,6 +1145,22 @@ var eulerianCycle = function() {
 		}));
 	}
 	
+	var createOrderTextBoxes = function(solution) {
+		var obj;
+		var orderPlane;
+		
+		console.log(solution)
+		
+		for(var i = 0; i < solution.length; i++) {
+			orderPlane = UTILS.createLabel(i.toString(), ORDER_TEXT_COLOR);
+			obj = scene.getObjectById(solution[i]);
+			
+			orderPlane.position.set(obj.position.x, obj.position.y + ORDER_TEXT_DISTANCE_Y, LABEL_LAYER);
+			scene.add(orderPlane);
+			orderTexts.push(orderPlane);
+		}
+	}
+	
 	var checkNewSolution = function(newSolution) {
 		console.log(newSolution);
 		
@@ -958,7 +1198,7 @@ var eulerianCycle = function() {
 	
 	//Animation where the arrows are drawn out incrementally starting with the first edge to the last in the circuit
 	var animationSetUp = function() {
-		if(solutions.length === -1) {
+		if(solutions.length === 0) {
 			return;
 		}
 		
@@ -968,6 +1208,8 @@ var eulerianCycle = function() {
 		for(var i = 0; i < solutions[currSol].length; i++) {
 			circuit.push(solutions[currSol][i]);
 		}
+		
+		createOrderTextBoxes(solutions[currSol]);
 		
 		var iterationsPerEdge = ITERATIONS/(circuit.length - 1);
 		var endPoints = [];
@@ -1056,7 +1298,11 @@ var eulerianCycle = function() {
 		for(var i = 0; i < animationObjects.length; i++) {
 			scene.remove(animationObjects[i]);
 		}
+		for(var i = 0; i < orderTexts.length; i++) {
+			scene.remove(orderTexts[i]);
+		}
 		animationObjects = [];
+		orderTexts = [];
 	}
 	var clearSolutions = function() {
 		currSol = 0;
@@ -1112,7 +1358,7 @@ var eulerianCycle = function() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
-///////////                      ~Hamiltonian Cyclce~                             //////////////////////
+///////////                      ~Hamiltonian Cycle~                             //////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 var hamiltonianCycle = function() {
 	const ANIMATION_TIME = 2000;
@@ -1121,6 +1367,8 @@ var hamiltonianCycle = function() {
 	const ARROW_LAYER = 0; //Keep at this value, it won't appear otherwise
 	const HEAD_LENGTH = 20;
 	const HEAD_WIDTH = 10;
+	const ORDER_TEXT_COLOR = 'white';
+	const ORDER_TEXT_DISTANCE_Y = 45;
 	
 	var doing = false;
 	
@@ -1128,7 +1376,13 @@ var hamiltonianCycle = function() {
 	var solutions = [];
 	var currSol = 0;
 	var animationObjects = [];
+	var orderTexts = [];
 	var animationParameters = [];
+	
+	var preSelectList = [];
+	var preSelectLabels =[];
+	const PRESELECT_LABEL_COLOR = 'red';
+	const LABEL_OFFSET = 50;
 	
 	var actualIterations; //correction of ITERATIONS
 	var matrix;
@@ -1138,8 +1392,10 @@ var hamiltonianCycle = function() {
 	var main = function() {
 		if(solutions.length === 0) {
 				
-			ANIMATIONCONTROL.swapButtons(true);
+			ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
+			
 			matrix = UTILS.setUpMatrixId();
+			
 			if(GRAPH.nodes.length <= 1) {
 				return;
 			}
@@ -1171,8 +1427,8 @@ var hamiltonianCycle = function() {
 		WEBWORKERMANAGER.enlistWebWorker(JSON.stringify({
 			type: "HC",
 			context: {
-				circuit: [],
-				nodesVisited: [],
+				circuit: preSelectList,
+				nodesVisited: preSelectList,
 				matrix: matrix,
 				GRAPH: GRAPH.toStringJ()
 			}
@@ -1180,7 +1436,7 @@ var hamiltonianCycle = function() {
 	}
 	
 	var checkNewSolution = function(circuit) {
-		console.log(circuit);
+		clearPreselect()
 		
 		for(var i = 0; i < solutions.length; i++) {
 			if(rotateSolutionCheck(circuit, solutions[i])) {
@@ -1218,7 +1474,9 @@ var hamiltonianCycle = function() {
 	}
 	
 	var animationSetUp = function() {
-		if(solutions.length === -1) {
+		cleanUpAnimation();
+		
+		if(solutions.length === 0) {
 			return;
 		}
 		
@@ -1228,6 +1486,9 @@ var hamiltonianCycle = function() {
 		for(var i = 0; i < solutions[currSol].length; i++) {
 			circuit.push(solutions[currSol][i]);
 		}
+		
+		createOrderTextBoxes(solutions[currSol]);
+		
 		circuit.push(solutions[currSol][0]);
 		
 		var iterationsPerEdge = ITERATIONS/(circuit.length - 1);
@@ -1305,18 +1566,39 @@ var hamiltonianCycle = function() {
 		timeouts = [];
 		cleanUpAnimation();
 		
-		if(currSol !== -1) {
+		if(solutions.length !== 0) {
 			animationComplete(animationParameters[currSol].endPoints,
 			animationParameters[currSol].directionVectors,
 			animationParameters[currSol].finalLengths);
 		}
 	}
 	
+	var createOrderTextBoxes = function(solution) {
+		var obj;
+		var orderPlane;
+		
+		console.log(solution)
+		
+		for(var i = 0; i < solution.length; i++) {
+			orderPlane = UTILS.createLabel(i.toString(), ORDER_TEXT_COLOR);
+			obj = scene.getObjectById(solution[i]);
+			
+			orderPlane.position.set(obj.position.x, obj.position.y + ORDER_TEXT_DISTANCE_Y, LABEL_LAYER);
+			scene.add(orderPlane);
+			orderTexts.push(orderPlane);
+		}
+	}
+	
 	var cleanUpAnimation = function(){
+		clearPreselect();
 		for(var i = 0; i < animationObjects.length; i++) {
 			scene.remove(animationObjects[i]);
 		}
+		for(var i = 0; i < orderTexts.length; i++) {
+			scene.remove(orderTexts[i]);
+		}
 		animationObjects = [];
+		orderTexts = [];
 	}
 	var clearSolutions = function() {
 		currSol = 0;
@@ -1352,6 +1634,66 @@ var hamiltonianCycle = function() {
 		animationSetUp();
 	}
 	
+	var preselect = function(id) {
+		var myLabel;
+		var obj;
+		var index;
+		var objToRemove;
+		
+		if(preSelectList.includes(id)) {
+			index = preSelectList.indexOf(id);
+			preSelectList.splice(index, 1);
+			
+			scene.remove(preSelectLabels[index]);
+			preSelectLabels.splice(index, 1);
+			
+			for(var i = index; i < preSelectLabels.length; ) {
+				scene.remove(preSelectLabels[i]);
+				preSelectLabels.splice(i, 1);
+			}
+			
+			reorderList(index);
+		}
+		else {
+			preSelectList.push(id);
+			
+			myLabel = UTILS.createLabel(preSelectList.length.toString(), PRESELECT_LABEL_COLOR);
+			obj = scene.getObjectById(id);
+			
+			myLabel.position.set(obj.position.x, obj.position.y + LABEL_OFFSET, LABEL_LAYER);
+			
+			preSelectLabels.push(myLabel);
+			scene.add(myLabel);
+		}
+		
+		WEBWORKERMANAGER.restart();
+		ANIMATIONCONTROL.updateCounter();
+		clearSolutions();
+	}
+	
+	var reorderList = function(index) {
+		var obj;
+		var myLabel;
+		
+		for(var i = index; i < preSelectList.length; i++) {
+			myLabel = UTILS.createLabel((preSelectLabels.length + 1).toString(), PRESELECT_LABEL_COLOR);
+			obj = scene.getObjectById(preSelectList[i]);
+			
+			myLabel.position.set(obj.position.x, obj.position.y + LABEL_OFFSET, LABEL_LAYER);
+			
+			preSelectLabels.push(myLabel);
+			scene.add(myLabel);
+		}
+	}
+	
+	var clearPreselect = function() {
+		for(var i = 0; i < preSelectList.length; ) {
+			scene.remove(preSelectLabels[i]);
+			preSelectLabels.splice(i, 1);
+			preSelectList.splice(i, 1);
+		}
+	}
+	
 	return {
 		solutions: solutions,
 		currSol, currSol,
@@ -1363,12 +1705,14 @@ var hamiltonianCycle = function() {
 		prevSolution: prevSolution,
 		replaySolution: replaySolution,
 		checkNewSolution: checkNewSolution,
-		clearSolutions: clearSolutions
+		clearSolutions: clearSolutions,
+		preselect: preselect
 	}
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////                  End Hamiltonian Cycle                                //////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////                      ~Hamiltonian Path~                               //////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1388,6 +1732,11 @@ var hamiltonianPath = function() {
 	var animationObjects = [];
 	var animationParameters = [];
 	
+	var preSelectList = [];
+	var preSelectLabels =[];
+	const PRESELECT_LABEL_COLOR = 'red';
+	const LABEL_OFFSET = 50;
+	
 	var actualIterations; //correction of ITERATIONS
 	var matrix;
 	
@@ -1395,9 +1744,11 @@ var hamiltonianPath = function() {
 	
 	var main = function() {
 		if(solutions.length === 0) {
+			
+			ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
 				
-			ANIMATIONCONTROL.swapButtons(true);
 			matrix = UTILS.setUpMatrixId();
+			
 			if(GRAPH.nodes.length <= 1) {
 				return;
 			}
@@ -1425,12 +1776,12 @@ var hamiltonianPath = function() {
 		return false;
 	}
 	
-	var enlistWebWorkers = function() {
+	var enlistWebWorkers = function() {		
 		WEBWORKERMANAGER.enlistWebWorker(JSON.stringify({
 			type: "HP",
 			context: {
-				path: [],
-				nodesVisited: [],
+				path: preSelectList,
+				nodesVisited: preSelectList,
 				matrix: matrix,
 				GRAPH: GRAPH.toStringJ()
 			}
@@ -1438,8 +1789,8 @@ var hamiltonianPath = function() {
 	}
 	
 	var addNewSolution = function(path) {
-		console.log(path);
-		
+		clearPreselect();
+	
 		solutions.push(path);
 		ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
 		
@@ -1449,7 +1800,9 @@ var hamiltonianPath = function() {
 	}
 	
 	var animationSetUp = function() {
-		if(solutions.length === -1) {
+		cleanUpAnimation();
+		
+		if(solutions.length === 0) {
 			return;
 		}
 		
@@ -1535,7 +1888,7 @@ var hamiltonianPath = function() {
 		timeouts = [];
 		cleanUpAnimation();
 		
-		if(currSol !== -1) {
+		if(solutions.length !== 0) {
 			animationComplete(animationParameters[currSol].endPoints,
 			animationParameters[currSol].directionVectors,
 			animationParameters[currSol].finalLengths);
@@ -1543,6 +1896,7 @@ var hamiltonianPath = function() {
 	}
 	
 	var cleanUpAnimation = function(){
+		clearPreselect();
 		for(var i = 0; i < animationObjects.length; i++) {
 			scene.remove(animationObjects[i]);
 		}
@@ -1582,6 +1936,66 @@ var hamiltonianPath = function() {
 		animationSetUp();
 	}
 	
+	var preselect = function(id) {
+		var myLabel;
+		var obj;
+		var index;
+		var objToRemove;
+		
+		if(preSelectList.includes(id)) {
+			index = preSelectList.indexOf(id);
+			preSelectList.splice(index, 1);
+			
+			scene.remove(preSelectLabels[index]);
+			preSelectLabels.splice(index, 1);
+			
+			for(var i = index; i < preSelectLabels.length; ) {
+				scene.remove(preSelectLabels[i]);
+				preSelectLabels.splice(i, 1);
+			}
+			
+			reorderList(index);
+		}
+		else {
+			preSelectList.push(id);
+			
+			myLabel = UTILS.createLabel(preSelectList.length.toString(), PRESELECT_LABEL_COLOR);
+			obj = scene.getObjectById(id);
+			
+			myLabel.position.set(obj.position.x, obj.position.y + LABEL_OFFSET, LABEL_LAYER);
+			
+			preSelectLabels.push(myLabel);
+			scene.add(myLabel);
+		}
+		
+		WEBWORKERMANAGER.restart();
+		ANIMATIONCONTROL.updateCounter();
+		clearSolutions();
+	}
+	
+	var reorderList = function(index) {
+		var obj;
+		var myLabel;
+		
+		for(var i = index; i < preSelectList.length; i++) {
+			myLabel = UTILS.createLabel((preSelectLabels.length + 1).toString(), PRESELECT_LABEL_COLOR);
+			obj = scene.getObjectById(preSelectList[i]);
+			
+			myLabel.position.set(obj.position.x, obj.position.y + LABEL_OFFSET, LABEL_LAYER);
+			
+			preSelectLabels.push(myLabel);
+			scene.add(myLabel);
+		}
+	}
+	
+	var clearPreselect = function() {
+		for(var i = 0; i < preSelectList.length; ) {
+			scene.remove(preSelectLabels[i]);
+			preSelectLabels.splice(i, 1);
+			preSelectList.splice(i, 1);
+		}
+	}
+	
 	return {
 		solutions: solutions,
 		currSol, currSol,
@@ -1593,13 +2007,267 @@ var hamiltonianPath = function() {
 		prevSolution: prevSolution,
 		replaySolution: replaySolution,
 		addNewSolution: addNewSolution,
-		clearSolutions: clearSolutions
+		clearSolutions: clearSolutions,
+		preselect: preselect
 	}
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////                  End Hamiltonian Path                                 //////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////                      ~Graph Coloring~                                 //////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+var graphColor = function() {
+	const ANIMATION_TIME = 2000;
+	const ITERATIONS = ANIMATION_TIME/TIME_BT_FRAMES;
+	
+	var doing = false;
+	
+	var timeout = [];	
+	var solutions = [];
+	var currSol = 0;
+	var minColors = Number.POSITIVE_INFINITY;
+	var colorGrouping = [];
+	
+	var actualIterations; //correction of ITERATIONS
+	var matrix;
+	
+	var main = function() {
+		if(solutions.length === 0) {
+			ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
+			
+			matrix = UTILS.setUpMatrixId();
+			
+			enlistWebWorkers();
+		}
+		else {
+			colorNodes();
+			ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
+		}
+		
+		return;
+	}
+	
+	var enlistWebWorkers = function() {
+		WEBWORKERMANAGER.enlistWebWorker(JSON.stringify({
+			type: "GC",
+			context: {
+				nodeColors: [],
+				nodesLeft: [],
+				currentColor: -1,
+				changeColor: false,
+				matrix: matrix,
+				GRAPH: GRAPH.toStringJ(),
+				colors: ANIMATIONCONTROL.colors
+			}
+		}));
+	}
+	
+	var checkNewSolution = function(colors) {
+		if(colors.length === 0) {
+			return;
+		}
+		
+		//Only add if the solution is as or more optimized
+		if(colors.length <= minColors) {
+			//Remove longer solutions (should never occur, handled in the Welsh-Powell Algorithm in webworker)
+			if(minColors !== colors.length) {
+				minColors = colors.length;
+				removeExcessSolutions();
+			}
+			//Check for uniqueness if necessary
+			if(!checkColorGrouping(colors)) {
+				return;
+			}
+			
+			solutions.push(colors);
+			ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
+			
+			//Color if first solution (don't interrupt user any other time)
+			if(solutions.length == 1) {
+				colorNodes();
+			}
+			
+			//console.log(colorGrouping)
+		}
+	}
+	
+	//Create grouping, add to collection if unique
+	var checkColorGrouping = function(colors) {
+		var grouping = createNewGrouping(colors);
+		
+		if(compareGrouping(grouping)) {
+			colorGrouping.push(grouping);
+			return true;
+		}
+		
+		return false;
+	}
+	
+	//Compare grouping for uniqueness
+	var compareGrouping = function(newGroup) {
+		console.log(newGroup);
+		var oldGroup;
+		
+		var same = true;
+		
+		for(var i = 0; i < colorGrouping.length; i++) {
+			oldGroup = colorGrouping[i];
+			
+			if(differentGrouping(newGroup, oldGroup) == true) {
+				same = false;
+			}
+			
+			//Not unique
+			if(same === true) {
+				return false;
+			}
+			
+			same = true;
+		}
+		
+		return true;
+	} 
+	
+	//Check if the color groupings differ
+	var differentGrouping = function(x, y) {
+		var matchedPairs = [];
+		
+		if(x.length !== y.length) {
+			return true;
+		}
+		
+		for(var i = 0; i < x.length ; i++) {
+			for(var j = 0; j < y.length; j++) {
+				if((x[i].difference(y[j])).size === 0
+				&& matchedPairs[i] === undefined
+				&& !matchedPairs.includes(j)) {
+					matchedPairs[i] = j;
+					break;
+				}
+			}
+		}
+		
+		if(matchedPairs.length === x.length) {
+			return false;
+		}
+		
+		return true;
+		
+	}
+	
+	var createNewGrouping = function(colors) {
+		var grouping = [];
+		var grouped = false;
+		
+		console.log(colors);
+		
+		//Create first group color
+		grouping.push([]);
+		grouping[0].push(colors[0].color);
+		grouping[0].push(colors[0].id);
+		
+		//For each color
+		for(var i = 1; i < colors.length; i++) {
+			//Check if it belongs in any of the groups
+			for(var j = 0; j < grouping.length; j++) {
+				if(grouping[j][0] === colors[i].color) {
+					grouping[j].push(colors[i].id);
+					grouped = true;
+					break;
+				}
+			}
+			//New color was found
+			if(grouped === false) {
+				grouping.push([]);
+				grouping[grouping.length - 1].push(colors[i].color);
+				grouping[grouping.length - 1].push(colors[i].id);
+			}
+			//Assume false for the next color
+			grouped = false;
+		}
+		
+		for(var i = 0; i < grouping.length; i++) {
+			grouping[i].shift();
+			grouping[i] = new Set(grouping[i]);
+		}
+		
+		return grouping;
+	}
+	
+	var removeExcessSolutions = function() {
+		for(var i = 0; i < solutions.length; ) {
+			if(solutions[i].length > minColors) {
+				solutions.splice(i, 1);
+			}
+		}
+	}
+	
+	var colorNodes = function() {
+		if(solutions.length === 0) {
+			return;
+		}
+		
+		var obj;
+		
+		for(var i = 0; i < solutions[currSol].length; i++) {
+			obj = scene.getObjectById(solutions[currSol][i].id);
+			
+			console.log(solutions[currSol][i].color);
+			obj.material.color.setHex(solutions[currSol][i].color);
+		}
+	}
+	
+	var decolorNodes = function() {
+		for(var i = 0; i < GRAPH.nodes.length; i++) {
+			obj = scene.getObjectById(GRAPH.nodes[i].getId());
+			
+			obj.material.color.setHex(DEFAULT_COLOR);
+		}
+	}
+
+	var clearSolutions = function() {
+		currSol = 0;
+		solutions = [];
+		minColors = Number.POSITIVE_INFINITY;
+	}
+	
+	var nextSolution = function() {
+		if(solutions.length === 0) {
+			return;
+		}
+		
+		currSol = (currSol + 1)%solutions.length;
+		colorNodes();
+		ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
+	}
+	var prevSolution = function() {
+		if(solutions.length === 0) {
+			return;
+		}
+		
+		currSol = ((currSol - 1 >= 0)? currSol - 1 : solutions.length - 1)%solutions.length;
+		colorNodes();
+		ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
+	}
+	
+	return {
+		solutions: solutions,
+		currSol, currSol,
+		
+		main: main,
+		nextSolution: nextSolution,
+		prevSolution: prevSolution,
+		checkNewSolution: checkNewSolution,
+		clearSolutions: clearSolutions,
+		decolorNodes: decolorNodes,
+		colorNodes: colorNodes
+	}
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////                  End Graph Coloring                                   //////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////                This section deals with the actual graph                       /////////////////////////////////////////////////////////////////
@@ -1626,9 +2294,6 @@ var hamiltonianPath = function() {
 	findNode				  |
 	findEdge				  |
 	findEdges------------------
-	
-	Todo:
-	Naming nodes
 */
 var Graph = function() {
 	//Node Object
@@ -2267,16 +2932,12 @@ var graphDrawer = function() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////                           ~Graph Parser~                              //////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
-/*	graphParser INCOMPLETE
-
+/*
 	Handles all the parsing and generating of a graph by user input
 	
 	Public Methods:
 	parseSet - parses out the node and edge set and generates a graph
 	parseSeq - parses out the degree sequence and generates a graph
-	
-	Todo:
-	Actually generate a graph visaully
 */
 
 var graphParser = function() {
@@ -2293,6 +2954,11 @@ var graphParser = function() {
 	//Initializing
 	const DISTANCEFROMCENTER = 200;
 	
+	var nodeRegex = /^[\s]*[\w]{1,8}[\s]*$/;
+	var nodeSetRegex = /(^[\s]*$)|(^[\s]*[\w]{1,8}[\s]*([,][\s]*[\w]{1,8}[\s]*)*$)/;
+	var edgeRegex = /^[\s]*[\w]{1,8}[\s]*[,][\s]*[\w]{1,8}[\s]*$/;
+	var edgeSetRegex = /(^[\s*]$)|(^[\s]*[\w]{1,8}[\s]*[,][\s]*[\w]{1,8}[\s]*([;][\s]*[\w]{1,8}[\s]*[,][\s]*[\w]{1,8}[\s]*)*$)/;
+	var degRegex = /[\s]*[\d]+[\s]*([,][\s]*[\d]+[\s]*)/;
 	
 	//Parses the node and edge set
 	var parseSet = function(nodeStr, edgeStr) {
@@ -2301,19 +2967,18 @@ var graphParser = function() {
 		edgeSet = new Set();
 		errorMsg = [];
 		
-		//Node names can only contain contain numbers, letters, underscores
-		//Edge set input can only contain a semi colon separated list of node pairs separated by commas
-		var nodeRegex = /[\s]*[\w][\w\s]*/;
-		var edgeSetRegex = /[\s]*[\w][\w\s]*[,][\s]*[\w][\w\s]*([;][\s]*[\w][\w\s]*[,][\s]*[\w][\w\s]*)*/;
-		
-		if(nodeStr == "") {
-			hintBox("No nodes were named, so there was no graph to create.");
+		if(!nodeSetRegex.test(nodeStr)) {
+			HINTBOX.setErrorMessage("The node set was not in the correct format. Please read in the instructions below.");
 			return;
 		}
 		
-		//Removes execcseive spaces, and splits into array
-		var strArray = nodeStr.replace(/\s+/,' ').trim();
-		strArray = strArray.split(",");
+		if(nodeStr == "") {
+			HINTBOX.setErrorMessage("No nodes were named, so there was no graph to create.");
+			return;
+		}
+		
+		//Removes execcesive spaces, and splits into array
+		var strArray = (nodeStr.replace(/\s+/,' ').trim()).split(",");
 		
 		for(var i = 0; i < strArray.length; i++) {
 			strArray[i] = strArray[i].trim();
@@ -2324,7 +2989,7 @@ var graphParser = function() {
 			}
 			//Stops on an erroneous name
 			if(!nodeRegex.test(strArray[i])) {
-				hintBox( "'" + strArray[i] + "' The names for the nodes can only contain numbers, letters, underscores.");
+				HINTBOX.setErrorMessage( "'" + strArray[i] + "' The names for the nodes can only contain numbers, letters, underscores.");
 				return;
 			}
 			//Avoids duplicates
@@ -2342,11 +3007,11 @@ var graphParser = function() {
 		
 		//Stops on erroneous input
 		if(strArray !== "" && !edgeSetRegex.test(strArray)) {
-			hintBox("The edge set does not follow the correct format.");
+			HINTBOX.setErrorMessage("The edge set does not follow the correct format.");
 			return;
 		}
 		
-		//Splits inti array of pairs
+		//Splits into array of pairs
 		strArray = strArray.split(";");
 		for(var i = 0; i < strArray.length; i++) {
 			//Ignores blanks
@@ -2357,17 +3022,17 @@ var graphParser = function() {
 			strArray[i] = strArray[i].split(",");
 			//Confirms that they are pairs
 			if(!(Array.isArray(strArray[i]) && strArray[i].length == 2)) {
-				hintBox(edgeStr.split(";")[i] + "must have two nodes");
+				HINTBOX.setErrorMessage(edgeStr.split(";")[i] + "must have two nodes");
 			}
 			
 			strArray[i][0] = strArray[i][0].trim();
 			strArray[i][1] = strArray[i][1].trim();
 			//Stops when a node was never named
 			if(!nodeSet.has(strArray[i][0])) {
-				hintBox(strArray[i][0] + " was not defined as a node.");
+				HINTBOX.setErrorMessage(strArray[i][0] + " was not defined as a node.");
 			}
 			else if(!nodeSet.has(strArray[i][1])) {
-				hintBox(strArray[i][1] + " was not defined as a node.");
+				HINTBOX.setErrorMessage(strArray[i][1] + " was not defined as a node.");
 			}
 			//Ignores duplicate edges
 			else if (edgeSet.has([strArray[i][0], strArray[i][1]]) || edgeSet.has([strArray[i][1], strArray[i][0]])){
@@ -2385,7 +3050,7 @@ var graphParser = function() {
 			for(var i = 0; i < errorMsg.length; i++) {
 				str += errorMsg[i] + "<br/>";
 			}
-			hintBox(str);
+			HINTBOX.setErrorMessage(str);
 		}
 		
 		nodeSet = Array.from(nodeSet);
@@ -2402,13 +3067,11 @@ var graphParser = function() {
 		var edgeSet = [];
 		var errorMsg = "";
 		
-		//String must be a comma separated list allowing spaces
-		var degRegex = /[\s]*[\d]+[\s]*([,][\s]*[\d]+[\s]*)/;
 		var degArray;
 		
 		if(!degRegex.test(degStr)) {
 			errorMsg = "The degree sequence must be a comma separated list of numbers. Leave no excessive/trailing commas";
-			hintBox(errorMsg);
+			HINTBOX.setErrorMessage(errorMsg);
 			return;
 		}
 		
@@ -2423,7 +3086,7 @@ var graphParser = function() {
 		//Create a node and edge set
 		errorMsg = havel_hakiniAlgorithm(degArray);
 		if(typeof msg == "string") {
-			hintBox(errorMsg);
+			HINTBOX.setErrorMessage(errorMsg);
 			return;
 		}
 		else {
@@ -2716,6 +3379,7 @@ var graphParser = function() {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 var UTILS = utils();
+var HINTBOX = hintBox();
 
 //Animation
 var ANIMATIONCONTROL = animationControl();
@@ -2732,6 +3396,7 @@ var EDGECONTRACTION = edgeContraction();
 var EULERIANCYCLE = eulerianCycle();
 var HAMILTONIANCYCLE = hamiltonianCycle();
 var HAMILTONIANPATH = hamiltonianPath();
+var GRAPHCOLOR = graphColor();
 
 
 $(document).ready(function(){
@@ -2740,7 +3405,8 @@ $(document).ready(function(){
 	animate();
 	
 	///////////////////////////////////////////////////////////////////////////////////////
-	/////////////// The flip panels outside the graph      ////////////////////////////////
+	/////////////// The flip panels outside the graph.     ////////////////////////////////
+	/////////////// Modifies hints pending on selection.   ////////////////////////////////
 	///////////////////////////////////////////////////////////////////////////////////////	
 	
 	//Flip panels
@@ -2750,6 +3416,12 @@ $(document).ready(function(){
 		$("#panel-3").slideUp("slow");
 		$("#panel-4").slideUp("slow");
 		$("#panel-5").slideUp("slow");
+		HINTBOX.setFormatMessage("Enter a node set and edge set to generate a graph. <br/>" +
+			"Node set format: the names can no be longer than 8 characters long. The names can " +
+			"include letters, numbers and underscores.<br/>" +
+			"Edge set format: pair of nodes are to be separated by a comma, and the list overall is semicolon separated." +
+			"e.g. NodeSet: A,B,C EdgeSet: A,B;B,C<br/>" +
+			"The list must be comma separated, leave no trailing commas.");
 	});
 	$("#flip-2").click(function(){
 		$("#panel-2").slideToggle("slow");
@@ -2757,6 +3429,9 @@ $(document).ready(function(){
 		$("#panel-3").slideUp("slow");
 		$("#panel-4").slideUp("slow");
 		$("#panel-5").slideUp("slow");
+		HINTBOX.setFormatMessage("Enter a degree sequence to generate a graph. <br/>" +
+			"The degree sequence must be a comma separated list, and cannot have trailing comma.<br/>" +
+			"e.g. Degree Sequence: 2,1,1,0");
 	});
 	$("#flip-3").click(function(){
 		$("#panel-3").slideToggle("slow");
@@ -2764,6 +3439,7 @@ $(document).ready(function(){
 		$("#panel-2").slideUp("slow");
 		$("#panel-4").slideUp("slow");
 		$("#panel-5").slideUp("slow");
+		HINTBOX.setFormatMessage("");
 	});
 	$("#flip-4").click(function(){
 		$("#panel-4").slideToggle("slow");
@@ -2771,6 +3447,7 @@ $(document).ready(function(){
 		$("#panel-2").slideUp("slow");
 		$("#panel-3").slideUp("slow");
 		$("#panel-5").slideUp("slow");
+		HINTBOX.setFormatMessage("");
 	});
 	$("#flip-5").click(function(){
 		$("#panel-5").slideToggle("slow");
@@ -2778,6 +3455,7 @@ $(document).ready(function(){
 		$("#panel-2").slideUp("slow");
 		$("#panel-3").slideUp("slow");
 		$("#panel-4").slideUp("slow");
+		HINTBOX.setFormatMessage("");
 	});
 	
 	//Submissions
@@ -2802,29 +3480,44 @@ $(document).ready(function(){
 	///////////////////////////////////////////////////////////////////////////////////////	
 	
 	//Saving
-	$("#save-PDF").click(function() {
-		$("#PDFModal").show();
+	$('#Save-Form').click(function() {
+		if($('#PDF').is(':checked')) { 
+		   $("#Filename").val($("#Filename").val().replace(/[.].*/, ".pdf"));
+		}
+		else if($('#PNG').is(':checked')) { 
+		   $("#Filename").val($("#Filename").val().replace(/[.].*/, ".png"));
+		}
+		else if($('#JPG').is(':checked')) { 
+		   $("#Filename").val($("#Filename").val().replace(/[.].*/, ".jpg"));
+		}
+		e
 	});
-	$("#save-PDF-Set").click(function() {
-		var orientation = $("input[name=Orientation]:checked", "#PDF-form").val();
+	$("#save-file").click(function() {
+		$('#SaveModal').show();
+	});
+	$("#save-File-Set").click(function() {
+		var filetype = $("input[name=FileType]:checked", "#Save-Form").val();
 		var filename = $("#Filename").val();
 		
-		orientation = orientation == "Landscape" ? "l" : "p"; 
-		
-		var doc = new jsPDF(orientation, "mm", "a4");
-		var imgData = renderer.domElement.toDataURL("image/jpeg");
-		
-		if(orientation == "p") {
-			doc.addImage(imgData, 'JPEG', 10, 10, CANVAS_WIDTH_PORTRAIT, CANVAS_WIDTH_PORTRAIT*$("#renderer").height()/$("#renderer").width());
-		} else {
-			doc.addImage(imgData, 'JPEG', 10, 35, CANVAS_WIDTH_LANDSCAPE, CANVAS_WIDTH_LANDSCAPE*$("#renderer").height()/$("#renderer").width());
+		if(filetype === "PDF") {
+			var doc = new jsPDF("l", "mm", "a4");
+			var imgData = renderer.domElement.toDataURL("image/jpeg");
+			doc.addImage(imgData, 'JPEG', 10, 10, CANVAS_WIDTH_LANDSCAPE, CANVAS_WIDTH_LANDSCAPE*$("#renderer").height()/$("#renderer").width());
+			doc.save(filename);
+		}
+		else if(filetype === "PNG") {
+			var imgData = renderer.domElement.toDataURL("image/png");
+			download(imgData, filename);
+		}
+		else if(filetype === "JPG") {
+			var imgData = renderer.domElement.toDataURL("image/jpeg");
+			download(imgData, filename);
 		}
 		
-		doc.save(filename);
-		$("#PDFModal").hide();
+		$("#SaveModal").hide();
 	});
 	$(".close").click(function() {
-		$("#PDFModal").hide();
+		$("#SaveModal").hide();
 	});
 	$("#save-Link").click(function() {		
 		
@@ -2908,6 +3601,10 @@ $(document).ready(function(){
 		}
 		else if(mode == "renameNodeMode") {
 			renameNode(event.pageX, (event.pageY - $(this).offset().top));
+		}
+		else if(mode == "hamiltonianPathMode"
+		|| mode === "hamiltonianCycleMode") {
+			selectionList();
 		}
 	});
 	
@@ -3040,20 +3737,13 @@ function init() {
 	//Setup of animation buttons, and other 
 	ANIMATIONCONTROL.buttonSetup();
 	ANIMATIONCONTROL.positionButtons();
-	hintBox();
+	HINTBOX.setErrorMessage("");
 	$("#nodeNameInput").hide();
 	
 	//Auto load anything from session storage
 	if(sessionStorage.getItem('graph')) {
 		load(sessionStorage.getItem('graph'));
 	}
-}
-
-function hintBox(text="") {			
-	if(text != "") {
-		text += "<br/><br/>"; 
-	}
-	$("#hint").html(text + "Ctrl + Q - resets the camera view<br/>Hold Down Right Mouse Button - Pan<br/>Scroll - Zoom In/Out<br/>");
 }
 
 //Loading a Graph in
@@ -3201,9 +3891,16 @@ function renameNode(x, y) {
 function nameNode(name, nId) {
 	GRAPHDRAWER.nameNode(name, nId);
 }
-//Naming Node
-function popUpNameInput() {
-	
+function selectionList() {
+	var intersects = raycaster.intersectObjects( scene.children );	
+	if(INTERSECTED !== null && INTERSECTED.userData == "Node") {
+		if(mode === "hamiltonianPathMode") {
+			HAMILTONIANPATH.preselect(INTERSECTED.id);
+		}
+		if(mode === "hamiltonianCycleMode") {
+			HAMILTONIANCYCLE.preselect(INTERSECTED.id);
+		}
+	}
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////                               ~Modes~                                                                     /////////////////////////////////////
@@ -3217,6 +3914,8 @@ function submitSetMode() {
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
 	ANIMATIONCONTROL.hideButtons();
+	ANIMATIONCONTROL.hideColorPicker();
+	ANIMATIONCONTROL.hidePreSelectButton();
 	mode = "submitSetMode";
 }
 function submitSeqMode() {
@@ -3225,58 +3924,76 @@ function submitSeqMode() {
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
 	ANIMATIONCONTROL.hideButtons();
+	ANIMATIONCONTROL.hideColorPicker();
+	ANIMATIONCONTROL.hidePreSelectButton();
 	mode = "submitSeqMode";
 }
 function drawNodeMode() {
-	hintBox("Left Click - Add a node");
+	HINTBOX.setModeMessage("Left Click to add a node");
 	resetSelection();
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
 	ANIMATIONCONTROL.hideButtons();
+	ANIMATIONCONTROL.hideColorPicker();
+	ANIMATIONCONTROL.hidePreSelectButton();
 	mode = "drawNode";
 }
 function drawEdgeMode() {
-	hintBox("Left click on two node to add an edge between them.");
+	HINTBOX.setModeMessage("Left click on two node to add an edge between them.<br/>" +
+		"Left click on an already selected node to deselect it.");
 	resetSelection();
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
 	ANIMATIONCONTROL.hideButtons();
+	ANIMATIONCONTROL.hideColorPicker();
+	ANIMATIONCONTROL.hidePreSelectButton();
 	mode = "drawEdge";
 }
 function deleteNodeMode() {
-	hintBox("Left click on a node to delete it.");
+	HINTBOX.setModeMessage("Left click on a node to delete it.");
 	resetSelection();
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
 	ANIMATIONCONTROL.hideButtons();
+	ANIMATIONCONTROL.hideColorPicker();
+	ANIMATIONCONTROL.hidePreSelectButton();
 	mode = "deleteNode";
 }
 function deleteEdgeMode() {
-	hintBox("Click on the two nodes the edges connects to delete it.");
+	HINTBOX.setModeMessage("Left click on an edge to delete it.");
 	resetSelection();
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
 	ANIMATIONCONTROL.hideButtons();
+	ANIMATIONCONTROL.hideColorPicker();
+	ANIMATIONCONTROL.hidePreSelectButton();
 	mode = "deleteEdge";
 }
 function moveNodeMode() {
-	hintBox("Hold left mouse button on the node to drag it.");
+	HINTBOX.setModeMessage("Hold left mouse button on the node to drag it.");
 	resetSelection();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
 	ANIMATIONCONTROL.hideButtons();
+	ANIMATIONCONTROL.hideColorPicker();
+	ANIMATIONCONTROL.hidePreSelectButton();
 	mode = "moveNode";
 }
 function renameNodeMode() {
+	HINTBOX.setModeMessage("Select a node, and enter the name you would like to give it in the input box that appears.<br/>"+
+		"Once done, press enter.<br/>" + 
+		"To delete a name or change your mind, leave the input box empty, and hit enter.");
 	resetSelection();
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
 	ANIMATIONCONTROL.hideButtons();
+	ANIMATIONCONTROL.hideColorPicker();
+	ANIMATIONCONTROL.hidePreSelectButton();
 	mode = "renameNodeMode";
 }
 function clearGraphAct() {
@@ -3286,24 +4003,19 @@ function clearGraphAct() {
 	GRAPHDRAWER.clearGraph();
 	ANIMATIONCONTROL.cleanUpAnimation();
 	ANIMATIONCONTROL.hideButtons();
+	ANIMATIONCONTROL.hideColorPicker();
+	ANIMATIONCONTROL.hidePreSelectButton();
 	mode = "clearGraphMode";
 }
-function printGraphAct() {
-	resetSelection();
-	cleanUp();
-	GRAPH.print();
-	ANIMATIONCONTROL.skipAnimation();
-	ANIMATIONCONTROL.cleanUpAnimation();
-	ANIMATIONCONTROL.hideButtons();
-	mode = "printGraphMode";
-}
 function edgeContractionMode() {
-	hintBox("Select the two nodes to which the edge connects to contract it.");
+	HINTBOX.setModeMessage("Select the two nodes to which the edge connects to contract it.");
 	resetSelection();
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
 	ANIMATIONCONTROL.hideButtons();
+	ANIMATIONCONTROL.hideColorPicker();
+	ANIMATIONCONTROL.hidePreSelectButton();
 	mode = "edgeContractionMode";
 }
 function complementAct() {
@@ -3312,39 +4024,73 @@ function complementAct() {
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
 	ANIMATIONCONTROL.hideButtons();
+	ANIMATIONCONTROL.hideColorPicker();
+	ANIMATIONCONTROL.hidePreSelectButton();
 	mode = "complementMode";
 	COMPLEMENT.main();
 }
 //Multi-solution Graph Function - should disaply buttons
 function eulerianCycleMode() {
+	HINTBOX.setModeMessage("If you would like to narrow the search area, you can partially preselect your own path.<br>" +
+		"Click on the nodes in the order you would like them to be in path.<br/>" +
+		"Click on an already selected node to remove it from the path.</br>" +
+		"When you are ready, click GO, and we will try to build upon the path you have, if you put in any.");
 	resetSelection();
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
 	ANIMATIONCONTROL.showButtons();
 	ANIMATIONCONTROL.swapButtons();
+	ANIMATIONCONTROL.hideColorPicker();
+	ANIMATIONCONTROL.hidePreSelectButton();
 	mode = "eulerianCycleMode";
 	EULERIANCYCLE.main();
 }
 function hamiltonianCycleMode() {
+	HINTBOX.setModeMessage("If you would like to narrow the search area, you can partially preselect your own path.<br>" +
+		"Click on the nodes in the order you would like them to be in path.<br/>" +
+		"Click on an already selected node to remove it from the path.</br>" +
+		"When you are ready, click GO, and we will try to build upon the path you have, if you put in any.<br/>" +
+		"Be warned. If you preselect a node, the solutions given so far and currently being calculated will be cleared.");
 	resetSelection();
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
 	ANIMATIONCONTROL.showButtons();
 	ANIMATIONCONTROL.swapButtons();
+	ANIMATIONCONTROL.hideColorPicker();
+	ANIMATIONCONTROL.showPreSelectButton();
 	mode = "hamiltonianCycleMode";
-	HAMILTONIANCYCLE.main();
 }
 function hamiltonianPathMode() {
+	HINTBOX.setModeMessage("If you would like to narrow the search area, you can partially preselect your own path.<br>" +
+		"Click on the nodes in the order you would like them to be in path.<br/>" +
+		"Click on an already selected node to remove it from the path.</br>" +
+		"When you are ready, click GO, and we will try to build upon the path you have, if you put in any.");
 	resetSelection();
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
 	ANIMATIONCONTROL.showButtons();
 	ANIMATIONCONTROL.swapButtons();
+	ANIMATIONCONTROL.hideColorPicker();
+	ANIMATIONCONTROL.showPreSelectButton();
 	mode = "hamiltonianPathMode";
-	HAMILTONIANPATH.main();
+}
+
+function graphColorMode() {
+	HINTBOX.setModeMessage("You can select any color you want to color the graph with.<br/>" +
+		"The number indicates when that color will be used, if necessary.<br/>" +
+		"When you are ready, click GO.");
+	resetSelection();
+	cleanUp();
+	ANIMATIONCONTROL.skipAnimation();
+	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.showButtons();
+	ANIMATIONCONTROL.swapButtons();
+	ANIMATIONCONTROL.showColorPicker();
+	ANIMATIONCONTROL.hidePreSelectButton();
+	mode = "graphColorMode";
 }
 	
 //Resets selections
