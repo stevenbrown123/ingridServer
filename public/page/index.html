@@ -322,55 +322,61 @@
 				
 				var firstOpportunity = false;
 				var potential = false;
+				
 				var newContext = {};
+				var currentContext = {};
+				var backUpContext = {};
 				
 				if(obj.type === "EC") {
 				
 					//Backup context
-					obj = obj.context;
+					backUpContext = obj.context;
+					backUpContext = unwrap(backUpContext);
 					
 					//Create current context
-					var circuit = obj.circuit.slice();
-					var edgesVisited = obj.edgesVisited.slice();
-					var unusedEdges = obj.unusedEdges.slice();
-					var start = obj.start;
-					var last = obj.last;
-					var matrix = obj.matrix;
-					var GRAPH = JSON.parse(obj.GRAPH);
+					currentContext = copyECContext(backUpContext);
 				
 					//This condition should never be false
 					while(true) {
 						//Either new or a mini cycle was completed, so start off the next cycle
-						if(start === last) {
+						if(backUpContext.start === backUpContext.last) {
 							//Explore the leftover adjacent edges
-							for(var i = 0; i < GRAPH.nodes.length; i++) {
-								if(matrix[start][GRAPH.nodes[i].id] !== null 
+							for(var i = 0; i < backUpContext.GRAPH.nodes.length; i++) {
+								if(backUpContext.matrix[backUpContext.start][backUpContext.GRAPH.nodes[i].id] !== null 
 								&& !edgesVisited.includes(matrix[start][GRAPH.nodes[i].id])) {
 									
 									potential = true;
 									//Update current context to continue
 									if(firstOpportunity === false) {
-										circuit.push(GRAPH.nodes[i].id);
-										last = GRAPH.nodes[i].id;
-										unusedEdges[start] = unusedEdges[start] === undefined || unusedEdges[start] === 
-											null ? GRAPH.nodes[findIndexOfNode(GRAPH.nodes, start)].degree - 1 : unusedEdges[start] - 1;
-										unusedEdges[last] = unusedEdges[last] === undefined || unusedEdges[last] === 
-											null ? GRAPH.nodes[findIndexOfNode(GRAPH.nodes, last)].degree - 1 : unusedEdges[last] - 1;
-										edgesVisited.push(matrix[start][last]);
+										currentContext.circuit.push(GRAPH.nodes[i].id);
+										currentContext.last = GRAPH.nodes[i].id;
+										currentContext.unusedEdges[start] = currentContext.unusedEdges[start] === undefined || 
+											currentContext.unusedEdges[currentContext.start] === null ? 
+											currentContext.GRAPH.nodes[findIndexOfNode(currentContext.GRAPH.nodes, currentContext.start)].degree - 1 : 
+											currentContext.unusedEdges[currentContext.start] - 1;
+										currentContext.unusedEdges[last] = currentContext.unusedEdges[last] === undefined || 
+											currentContext.unusedEdges[currentContext.last] === null ? 
+											currentContext.GRAPH.nodes[findIndexOfNode(currentContext.GRAPH.nodes, currentContext.last)].degree - 1 : 
+											currentContext.unusedEdges[currentContext.last] - 1;
+										currentContext.edgesVisited.push(currentContext.matrix[currentContext.start][currentContext.last]);
 										firstOpportunity = true;
 									}
 									//Copy backup context and update for new path and queue it up
 									else {
-										newContext = copyECContext(obj);
-										newContext.circuit.push(GRAPH.nodes[i].id);
-										newContext.last = GRAPH.nodes[i].id;
-										newContext.unusedEdges[newContext.start] = newContext.unusedEdges[newContext.start] === undefined || newContext.unusedEdges[newContext.start] === 
-											null ? GRAPH.nodes[findIndexOfNode(GRAPH.nodes,newContext.start)].degree - 1 : newContext.unusedEdges[newContext.start] - 1;
-										newContext.unusedEdges[newContext.last] = newContext.unusedEdges[newContext.last] === undefined || newContext.unusedEdges[newContext.last] === 
-											null ? GRAPH.nodes[findIndexOfNode(GRAPH.nodes,newContext.last)].degree - 1 : newContext.unusedEdges[newContext.last] - 1;
-										newContext.edgesVisited.push(matrix[newContext.start][newContext.last]);
+										newContext = copyECContext(backUpContext);
+										newContext.circuit.push(newContext.GRAPH.nodes[i].id);
+										newContext.last = newContext.GRAPH.nodes[i].id;
+										newContext.unusedEdges[newContext.start] = newContext.unusedEdges[newContext.start] === 
+											undefined || newContext.unusedEdges[newContext.start] === null ? 
+											newContext.GRAPH.nodes[findIndexOfNode(newContext.GRAPH.nodes, newContext.start)].degree - 1 : 
+											newContext.unusedEdges[newContext.start] - 1;
+										newContext.unusedEdges[newContext.last] = newContext.unusedEdges[newContext.last] === 
+											undefined || newContext.unusedEdges[newContext.last] === null ? 
+											newContext.GRAPH.nodes[findIndexOfNode(newContext.GRAPH.nodes, newContext.last)].degree - 1 : 
+											newContext.unusedEdges[newContext.last] - 1;
+										newContext.edgesVisited.push(newContext.matrix[newContext.start][newContext.last]);
 										
-										self.postMessage(ECReport(newContext, "Incomplete"));
+										self.postMessage(ECReport(wrap(newContext), "Incomplete"));
 									}
 								}
 							}
@@ -380,61 +386,63 @@
 							}
 							
 							//Update backup context and reset bool
-							obj = copyECContext({circuit, edgesVisited, matrix, unusedEdges, start, last, GRAPH: JSON.stringify(GRAPH)});
+							backUpContext = copyECContext(currentContext);
 							firstOpportunity = false;
 							potential = false;
 						}
 						
 						//Builds path until start node is encountered
-						while(start !== last) {
+						while(backUpContext.start !== backUpContext.last) {
 							//Chooses next node, checks if the start is encountered or not
-							for(var i = 0; i < GRAPH.nodes.length; i++) {
-								if(matrix[last][GRAPH.nodes[i].id] !== null 
-								&& start === GRAPH.nodes[i].id 
-								&& !edgesVisited.includes(matrix[last][GRAPH.nodes[i].id])) {
+							for(var i = 0; i < backUpContext.GRAPH.nodes.length; i++) {
+								if(currentContext.matrix[currentContext.last][currentContext.GRAPH.nodes[i].id] !== null 
+								&& currentContext.start === currentContext.GRAPH.nodes[i].id 
+								&& !currentContext.edgesVisited.includes(matrix[currentContext.last][currentContext.GRAPH.nodes[i].id])) {
 									
 									potential = true;
 									
 									if(firstOpportunity === false) {
-										edgesVisited.push(matrix[last][GRAPH.nodes[i].id]);
-										unusedEdges[last]--;
-										unusedEdges[start]--;
-										last = start;
+										currentContext.edgesVisited.push(matrix[currentContext.last][currentContext.GRAPH.nodes[i].id]);
+										currentContext.unusedEdges[currentContext.last]--;
+										currentContext.unusedEdges[currentContext.start]--;
+										currentContext.last = currentContext.start;
 										firstOpportunity = true;
 									}
 									else {
-										newContext = copyECContext(obj);
-										newContext.edgesVisited.add(matrix[newContext.last][GRAPH.nodes[i].id]);
+										newContext = copyECContext(currentContext);
+										newContext.edgesVisited.add(matrix[newContext.last][newContext.GRAPH.nodes[i].id]);
 										newContext.last = newContext.start;
-										newContext.unusedEdges[circuit[circuit.length - 1]]--;
+										newContext.unusedEdges[newContext.circuit[newContext.circuit.length - 1]]--;
 										newContext.unusedEdges[newContext.start]--;
 									}
 								}
-								else if(matrix[last][GRAPH.nodes[i].id] !== null 
-								&& !edgesVisited.includes(matrix[last][GRAPH.nodes[i].id])) {
+								else if(backUpContext.matrix[backUpContext.last][backUpContext.GRAPH.nodes[i].id] !== null 
+								&& !backUpContext.edgesVisited.includes(backUpContext.matrix[backUpContext.last][backUpContext.GRAPH.nodes[i].id])) {
 								
 									potential = true;
 								
 									if(firstOpportunity === false) {
-										edgesVisited.push(matrix[last][GRAPH.nodes[i].id]);
-										last = GRAPH.nodes[i].id;
-										circuit.push(last);
-										unusedEdges[last] = unusedEdges[last] === undefined || unusedEdges[last] ===
-											null ? GRAPH.nodes[findIndexOfNode(GRAPH.nodes, last)].degree - 1 : unusedEdges[last] - 1;
-										unusedEdges[circuit[circuit.length - 2]]--;
+										currentContext.edgesVisited.push(currentContext.matrix[currentContext.last][currentContext.GRAPH.nodes[i].id]);
+										currentContext.last = currentContext.currentContext.GRAPH.nodes[i].id;
+										currentContext.circuit.push(currentContext.last);
+										currentContext.unusedEdges[currentContext.last] = currentContext.unusedEdges[currentContext.last] === 
+											undefined || currentContext.unusedEdges[currentContext.last] === null ? 
+											currentContext.GRAPH.nodes[findIndexOfNode(currentContext.GRAPH.nodes, currentContext.last)].degree - 1 : 
+											currentContext.unusedEdges[currentContext.last] - 1;
+										currentContext.unusedEdges[currentContext.circuit[currentContext.circuit.length - 2]]--;
 										
 										firstOpportunity = true;
 									}
 									else {
-										newContext = copyECContext(obj);
+										newContext = copyECContext(currentContext);
 										newContext.edgesVisited.push(matrix[newContext.last][GRAPH.nodes[i].id]);
 										newContext.last = GRAPH.nodes[i].id;
 										newContext.circuit.push(newContext.last);
 										newContext.unusedEdges[newContext.last] = newContext.unusedEdges[newContext.last] === undefined || newContext.unusedEdges[newContext.last] ===
 											null ? GRAPH.nodes[findIndexOfNode(GRAPH.nodes, newContext.last)].degree - 1 : newContext.unusedEdges[newContext.last] - 1;
-										newContext.unusedEdges[circuit[circuit.length - 2]]--;
+										newContext.unusedEdges[newContext.circuit[newContext.circuit.length - 2]]--;
 										
-										self.postMessage(ECReport(newContext, "Incomplete"));
+										self.postMessage(ECReport(wrap(newContext), "Incomplete"));
 									}
 								}
 							}
@@ -445,48 +453,48 @@
 							
 							//Update backup context and reset bool
 							firstOpportunity = false;
-							obj = copyECContext({circuit, edgesVisited, matrix, unusedEdges, start, last, GRAPH: JSON.stringify(GRAPH)});
+							backUpContext = copyECContext(currentContext);
 							potential = false;
 						}
 						
 						start = null;
 						
 						//Finds nodes with unused edges
-						for(var i = 0; i < GRAPH.nodes.length; i++) {
-							if((unusedEdges[GRAPH.nodes[i].id] !== undefined && 
-								unusedEdges[GRAPH.nodes[i].id] !== null) &&
-								unusedEdges[GRAPH.nodes[i].id] !== 0) {
+						for(var i = 0; i < backUpContext.GRAPH.nodes.length; i++) {
+							if((backUpContext.unusedEdges[backUpContext.GRAPH.nodes[i].id] !== undefined && 
+								backUpContext.unusedEdges[backUpContext.GRAPH.nodes[i].id] !== null) &&
+								backUpContext.unusedEdges[backUpContext.GRAPH.nodes[i].id] !== 0) {
 								
 								potential = true;
 								
 								if(firstOpportunity === false) {
 									
-									start = last = GRAPH.nodes[i].id;
+									currentContext.start = currentContext.last = currentContext.GRAPH.nodes[i].id;
 									firstOpportunity = true;
 								}
 								else {
-									newContext = copyECContext(obj);
-									newContext.start = newContext.last = GRAPH.nodes[i].id;
+									newContext = copyECContext(backUpContext);
+									newContext.start = newContext.last = newContext.GRAPH.nodes[i].id;
 									
 									while(newContext.start != newContext.circuit[0]) {
 										newContext.circuit.push(newContext.circuit.shift());
 									}
 									newContext.circuit.push(newContext.last);
 									
-									self.postMessage(ECReport(newContext, "Incomplete"));
+									self.postMessage(ECReport(wrap(newContext), "Incomplete"));
 								}
 							}
 						};
 						
 						//Update backup context and reset bool
 						firstOpportunity = false;
-						obj = copyECContext({circuit, edgesVisited, matrix, unusedEdges, start, last, GRAPH: JSON.stringify(GRAPH)});
+						backUpContext = copyECContext(currentContext);
 						
 						//This is the eulerian circuit
-						if(start === null) {
-							circuit.push(last);
-							obj = copyECContext({circuit, edgesVisited, matrix, unusedEdges, start, last, GRAPH: JSON.stringify(GRAPH)});
-							self.postMessage(ECReport(obj,"Complete"));
+						if(currentContext.start === null) {
+							currentContext.circuit.push(currentContext.last);
+							backUpContext = copyECContext(currentContext);
+							self.postMessage(ECReport(wrap(currentContext),"Complete"));
 							return;
 						}
 						
@@ -499,71 +507,69 @@
 						potential = false;
 						
 						//Rotates circuit for the new starting node
-						while(start !== circuit[0]) {
-							circuit.push(circuit.shift());
+						while(currentContext.start !== currentContext.circuit[0]) {
+							currentContext.circuit.push(currentContext.circuit.shift());
 						}
-						circuit.push(last);
-						obj = copyECContext({circuit, edgesVisited, matrix, unusedEdges, start, last, GRAPH: JSON.stringify(GRAPH)});
+						currentContext.circuit.push(currentContext.last);
+						backUpContext = copyECContext(currentContext);
 					}
 				}
 				//Hamiltonian Cycle
 				else if(obj.type === "HC") {
 					//Backup context
-					obj = obj.context;
+					backUpContext = obj.context;
+					backUpContext = unwrap(backUpContext);
 					
 					//This path's context
-					var circuit = obj.circuit.slice();
-					var nodesVisited = obj.nodesVisited.slice();
-					var matrix = obj.matrix;
-					var GRAPH = JSON.parse(obj.GRAPH);
+					currentContext = copyHCContext(backUpContext);
 					
 					//Select first node, if just starting
-					if(circuit.length === 0) {
-						for(var i = 0; i < GRAPH.nodes.length; i++) {
+					if(backUpContext.circuit.length === 0) {
+						for(var i = 0; i < backUpContext.GRAPH.nodes.length; i++) {
 							//Update current context to continue
 							if(firstOpportunity === false) {
-								circuit.push(GRAPH.nodes[i].id);
-								nodesVisited.push(GRAPH.nodes[i].id);
+								currentContext.circuit.push(currentContext.GRAPH.nodes[i].id);
+								currentContext.nodesVisited.push(currentContext.GRAPH.nodes[i].id);
 								
 								firstOpportunity = true;
 							}
 							//Copy backup context and update for new path and queue it up
 							else {
-								newContext = copyHCContext(obj);
-								newContext.circuit.push(GRAPH.nodes[i].id);
-								newContext.nodesVisited.push(GRAPH.nodes[i].id);
+								newContext = copyHCContext(backUpContext);
+								newContext.circuit.push(newContext.GRAPH.nodes[i].id);
+								newContext.nodesVisited.push(newContext.GRAPH.nodes[i].id);
 								
-								self.postMessage(HCReport(newContext, "Incomplete"));
+								self.postMessage(HCReport(wrap(newContext), "Incomplete"));
 							}
 						}
 					}
 					
 					//Update backup context and reset bool
-					obj = copyHCContext({circuit: circuit, nodesVisited: nodesVisited, matrix: matrix, GRAPH: JSON.stringify(GRAPH)});
+					backUpContext = copyHCContext(currentContext);
 					firstOpportunity = false;
 					
 					//Build up the path until failute or success
-					while(nodesVisited.length !== GRAPH.nodes.length) {
+					while(backUpContext.nodesVisited.length !== backUpContext.GRAPH.nodes.length) {
 						//Go through all possibilities
-						for(var i = 0; i < GRAPH.nodes.length; i++) {
+						for(var i = 0; i < backUpContext.GRAPH.nodes.length; i++) {
 							//Discount invalid paths (not adjacent or already on path)
-							if(matrix[circuit[circuit.length - 1]][GRAPH.nodes[i].id] !== null && 
-							!nodesVisited.includes(GRAPH.nodes[i].id)) {
+							if(backUpContext.matrix[backUpContext.circuit[backUpContext.circuit.length - 1]][backUpContext.GRAPH.nodes[i].id] !== null && 
+							!backUpContext.nodesVisited.includes(backUpContext.GRAPH.nodes[i].id)) {
 								//Update current context to continue
 								if(firstOpportunity === false) {
-									circuit.push(GRAPH.nodes[i].id);
-									nodesVisited.push(GRAPH.nodes[i].id);
+									currentContext.circuit.push(currentContext.GRAPH.nodes[i].id);
+									currentContext.nodesVisited.push(currentContext.GRAPH.nodes[i].id);
 									
 									firstOpportunity = true;
 									potential = true;
 								}
 								//Copy backup context and update for new path and queue it up
 								else {
-									newContext = copyHCContext(obj);
-									newContext.circuit.push(GRAPH.nodes[i].id);
-									newContext.nodesVisited.push(GRAPH.nodes[i].id);
+									newContext = copyHCContext(backUpContext);
+									newContext.circuit.push(newContext.GRAPH.nodes[i].id);
+									newContext.nodesVisited.push(newContext.GRAPH.nodes[i].id);
 									
-									self.postMessage(HCReport(newContext, "Incomplete"));
+									self.postMessage(HCReport(wrap(newContext), "Incomplete"));
 								}
 							}
 						}
@@ -576,15 +582,14 @@
 						//Reset potential and backup context for next step
 						potential = false;
 						firstOpportunity = false;
-						obj = copyHCContext({circuit: circuit, nodesVisited: nodesVisited, matrix: matrix, GRAPH: JSON.stringify(GRAPH)});
+						backUpContext = copyHCContext(currentContext);
 					}
 					
 					//Almost done! It's path not a cycle!
-					if(nodesVisited.length === GRAPH.nodes.length) {
+					if(backUpContext.nodesVisited.length === backUpContext.GRAPH.nodes.length) {
 						//Success! Can complete cycle
-						if(matrix[circuit[0]][circuit[circuit.length - 1]] !== null){
-							newContext = copyHCContext(obj);
-							self.postMessage(HCReport(newContext, "Complete"));
+						if(backUpContext.matrix[backUpContext.circuit[0]][backUpContext.circuit[backUpContext.circuit.length - 1]] !== null){
+							self.postMessage(HCReport(wrap(backUpContext), "Complete"));
 						}
 					}
 					
@@ -593,64 +598,62 @@
 				//Hamiltonian Path
 				else if(obj.type === "HP") {
 					//Backup context
-					obj = obj.context;
+					backUpContext = obj.context;
+					backUpContext = unwrap(backUpContext);
 					
 					//This path's context
-					var path = obj.path.slice();
-					var nodesVisited = obj.nodesVisited.slice();
-					var matrix = obj.matrix;
-					var GRAPH = JSON.parse(obj.GRAPH);
+					currentContext = copyHPContext(backUpContext);
 					
 					//Select first node, if just starting
-					if(path.length === 0) {
-						for(var i = 0; i < GRAPH.nodes.length; i++) {
+					if(backUpContext.path.length === 0) {
+						for(var i = 0; i < backUpContext.GRAPH.nodes.length; i++) {
 							//Update current context to continue
 							if(firstOpportunity === false) {
-								path.push(GRAPH.nodes[i].id);
-								nodesVisited.push(GRAPH.nodes[i].id);
+								currentContext.path.push(currentContext.GRAPH.nodes[i].id);
+								currentContext.nodesVisited.push(currentContext.GRAPH.nodes[i].id);
 								
 								firstOpportunity = true;
 							}
 							//Copy backup context and update for new path and queue it up
 							else {
-								newContext = copyHPContext(obj);
-								newContext.path.push(GRAPH.nodes[i].id);
-								newContext.nodesVisited.push(GRAPH.nodes[i].id);
+								newContext = copyHPContext(backUpContext);
+								newContext.path.push(newContext.GRAPH.nodes[i].id);
+								newContext.nodesVisited.push(newContext.GRAPH.nodes[i].id);
 								
-								self.postMessage(HPReport(newContext, "Incomplete"));
+								self.postMessage(HPReport(wrap(newContext), "Incomplete"));
 							}
 						}
 					}
 					
 					//Update backup context and reset bool
-					obj = copyHPContext({path: path, nodesVisited: nodesVisited, matrix: matrix, GRAPH: JSON.stringify(GRAPH)});
+					backUpContext = copyHPContext(currentContext);
 					firstOpportunity = false;
 					
 					//Build up the path until failute or success
-					while(nodesVisited.length !== GRAPH.nodes.length) {
+					while(backUpContext.nodesVisited.length !== backUpContext.GRAPH.nodes.length) {
 						//Go through all possibilities
-						for(var i = 0; i < GRAPH.nodes.length; i++) {
+						for(var i = 0; i < backUpContext.GRAPH.nodes.length; i++) {
 							//Discount invalid paths (not adjacent or already on path)
-							if(matrix[path[path.length - 1]][GRAPH.nodes[i].id] !== null && 
-							!nodesVisited.includes(GRAPH.nodes[i].id)) {
+							if(backUpContext.matrix[backUpContext.path[backUpContext.path.length - 1]][backUpContext.GRAPH.nodes[i].id] !== null && 
+							!backUpContext.nodesVisited.includes(backUpContext.GRAPH.nodes[i].id)) {
 								
 								//Update current context to continue
 								if(firstOpportunity === false) {
 									
-									path.push(GRAPH.nodes[i].id);
-									nodesVisited.push(GRAPH.nodes[i].id);
+									currentContext.path.push(currentContext.GRAPH.nodes[i].id);
+									currentContext.nodesVisited.push(currentContext.GRAPH.nodes[i].id);
 									
 									firstOpportunity = true;
 									potential = true;
 								}
 								//Copy backup context and update for new path and queue it up
 								else {
-									newContext = copyHPContext(obj);
+									newContext = copyHPContext(backUpContext);
 									
-									newContext.path.push(GRAPH.nodes[i].id);
-									newContext.nodesVisited.push(GRAPH.nodes[i].id);
+									newContext.path.push(newContext.GRAPH.nodes[i].id);
+									newContext.nodesVisited.push(newContext.GRAPH.nodes[i].id);
 									
-									self.postMessage(HPReport(newContext, "Incomplete"));
+									self.postMessage(HPReport(wrap(newContext), "Incomplete"));
 								}
 							}
 						}
@@ -663,13 +666,13 @@
 						//Reset potential and backup context for next step
 						potential = false;
 						firstOpportunity = false;
-						obj = copyHPContext({path: path, nodesVisited: nodesVisited, matrix: matrix, GRAPH: JSON.stringify(GRAPH)});
+						backUpContext = copyHPContext(currentContext);
 					}
 					
 					//This path was a success
-					if(nodesVisited.length === GRAPH.nodes.length) {
-						newContext = copyHPContext(obj);
-						self.postMessage(HPReport(newContext, "Complete"));
+					if(backUpContext.nodesVisited.length === backUpContext.GRAPH.nodes.length) {
+						newContext = copyHPContext(backUpContext);
+						self.postMessage(HPReport(wrap(newContext), "Complete"));
 					}	
 					
 					//This path was a failure, leave it to die
@@ -677,75 +680,67 @@
 				//Graph Coloring
 				else if(obj.type === "GC") {
 					//Backup context
-					obj = obj.context;
+					backUpContext = obj.context;
+					backUpContext = unwrap(backUpContext);
 					
 					//This path's context
-					var nodeColors = obj.nodeColors;
-					var nodesLeft = obj.nodesLeft;
-					var currentColor = obj.currentColor;
-					var changeColor = obj.changeColor;
-					var matrix = obj.matrix;
-					var GRAPH = JSON.parse(obj.GRAPH);
-					var colors = obj.colors;
-					
-					var giveUp = false;
+					currentContext = copyECContext(backUpContext);
 					
 					var candidateNode = {};
 					
 					//Setup
-					if(nodeColors.length === 0 && nodesLeft.length === 0) {
-						for(var i = 0; i < GRAPH.nodes.length; i++) {
-							nodesLeft.push({
-								id: GRAPH.nodes[i].id,
-								degree: GRAPH.nodes[i].degree,
+					if(backUpContext.nodeColors.length === 0 && backUpContext.nodesLeft.length === 0) {
+						for(var i = 0; i < backUpContext.GRAPH.nodes.length; i++) {
+							currentContext.nodesLeft.push({
+								id: currentContext.GRAPH.nodes[i].id,
+								degree: currentContext.GRAPH.nodes[i].degree,
 							})
 						}
 						
-						changeColor = true;
-						nodesLeft.sort(compareDegrees);
+						currentContext.changeColor = true;
+						currentContext.nodesLeft.sort(compareDegrees);
 						
 						//Update backup context
-						obj = copyGCContext({nodeColors: nodeColors, nodesLeft: nodesLeft, currentColor: currentColor,
-							changeColor: changeColor, matrix: matrix, GRAPH: JSON.stringify(GRAPH), colors: colors });
+						backUpContext = copyGCContext(currentContext);
 					}
 					
-					while(nodesLeft.length !== 0) {
+					while(backUpContext.nodesLeft.length !== 0) {
 						//Selecting a new color for incomplete coloring
-						if(changeColor === true){
+						if(backUpContext.changeColor === true){
 							
 							candidateNode = nodesLeft[0].id;
 							
 							//Selects nodes with same degree for other paths
-							for(var i = 1; i < nodesLeft.length && nodesLeft[i].degree === nodesLeft[0].degree; i++) {
-								newContext = copyGCContext(obj);
+							for(var i = 1; i < backUpContext.nodesLeft.length && 
+							backUpContext.nodesLeft[i].degree === backUpContext.nodesLeft[0].degree; i++) {
+								newContext = copyGCContext(backUpContext);
 								newContext.currentColor++;
 								newContext.changeColor = false;
 								newContext.nodeColors.push({id: newContext.nodesLeft[i].id, color: colors[newContext.currentColor]});
 								newContext.nodesLeft.splice(i, 1);
-								self.postMessage(GCReport(newContext, "Incomplete"));
+								self.postMessage(GCReport(wrap(newContext), "Incomplete"));
 							}
 							
 							//Update current context
-							currentColor++;
-							nodesLeft.shift();
-							nodeColors.push({id: candidateNode, color: colors[currentColor]});
-							changeColor = false;
+							currentContext.currentColor++;
+							currentContext.nodesLeft.shift();
+							currentContext.nodeColors.push({id: candidateNode, color: colors[currentContext.currentColor]});
+							currentContext.changeColor = false;
 							
 							//Update backup context
-							obj = copyGCContext({nodeColors: nodeColors, nodesLeft: nodesLeft, currentColor: currentColor,
-								changeColor: changeColor, matrix: matrix, GRAPH: JSON.stringify(GRAPH), colors: colors });
+							backUpContext = copyGCContext(currentContext);
 							
 							//Explore the possibilities
-							for(var i = 0; i < obj.nodesLeft.length; i++) {
-								if(matrix[candidateNode][obj.nodesLeft[i].id] === null) {
+							for(var i = 0; i < backUpContext.nodesLeft.length; i++) {
+								if(backUpContext.matrix[candidateNode][backUpContext.nodesLeft[i].id] === null) {
 									if(firstOpportunity === false) {
-										nodeColors.push({id: nodesLeft[i].id, color: colors[currentColor]});
-										nodesLeft.splice(i, 1);
+										currentContext.nodeColors.push({id: nodesLeft[i].id, color: colors[currentContext.currentColor]});
+										currentContext.nodesLeft.splice(i, 1);
 										firstOpportunity = true;
 									}
 									else {
-										newContext = copyGCContext(obj);
-										newContext.currentColor = currentColor;
+										newContext = copyGCContext(backUpContext);
+										newContext.currentColor = backUpContext.currentColor;
 										newContext.nodeColors.push({id: newContext.nodesLeft[i].id, color: colors[newContext.currentColor]});
 										newContext.nodesLeft.splice(i, 1);
 										newContext.changeColor = false;
@@ -755,42 +750,41 @@
 							}
 							
 							if(firstOpportunity === true) {
-								nodesLeft.splice(i, 1);
+								currentContext.nodesLeft.splice(i, 1);
 							}
 							
 							//Update backup context
-							obj = copyGCContext({nodeColors: nodeColors, nodesLeft: nodesLeft, currentColor: currentColor,
-								changeColor: changeColor, matrix: matrix, GRAPH: JSON.stringify(GRAPH), colors: colors });
+							backUpContext = copyGCContext(currentContext);
 							firstOpportunity = false;
 						}
 						//Continuing the same color
 						else {
-							giveUp = true;
+							potential = false;
 							//Explore the opportunities
-							for(var i = 0; i < obj.nodesLeft.length; i++) {
+							for(var i = 0; i < backUpContext.nodesLeft.length; i++) {
 								
-								if(checkAdjNodesColor(obj.nodesLeft[i], obj.nodeColors, matrix, colors[currentColor])) {
-									giveUp = false;
+								if(checkAdjNodesColor(backUpContext.nodesLeft[i], backUpContext.nodeColors, 
+								backUpContext.matrix, colors[backUpContext.currentColor])) {
+									potential = true;
 									if(firstOpportunity === false) {
-										nodeColors.push({id: nodesLeft[i].id, color: colors[currentColor]});
-										nodesLeft.splice(i, 1);
+										currentContext.nodeColors.push({id: nodesLeft[i].id, color: colors[currentContext.currentColor]});
+										currentContext.nodesLeft.splice(i, 1);
 										
 										firstOpportunity = true;
 									}
 									else {
-										newContext = copyGCContext(obj);
-										newContext.currentColor = currentColor;
+										newContext = copyGCContext(backUpContext);
+										newContext.currentColor = currentContext.currentColor;
 										newContext.nodeColors.push({id: newContext.nodesLeft[i].id, color: colors[newContext.currentColor]});
 										newContext.nodesLeft.splice(i, 1);
 										newContext.changeColor = false;
-										self.postMessage(GCReport(newContext, "Incomplete"));
+										self.postMessage(GCReport(wrap(newContext), "Incomplete"));
 									}
 								}								
 							}
 							
 							//Update backup context
-							obj = copyGCContext({nodeColors: nodeColors, nodesLeft: nodesLeft, currentColor: currentColor,
-								changeColor: changeColor, matrix: matrix, GRAPH: JSON.stringify(GRAPH), colors: colors });
+							backUpContext = copyGCContext(currentContext);
 							firstOpportunity = false;
 							
 							//Give up on this color
@@ -914,6 +908,17 @@
 				
 				return true;
 			} 
+			
+			function unwrap(obj) {
+				obj.GRAPH = JSON.parse(obj.GRAPH);
+				return obj;
+			}
+			
+			function wrap(obj) {
+				obj.GRAPH = JSON.stringify(obj.GRAPH);
+				return obj;
+			}
+			
 		</script>
 	
 		<script src="../javascripts/main.js"></script>
