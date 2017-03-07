@@ -586,10 +586,10 @@ var hintBox = function() {
 	}
 	
 	var outPutMessage =function() {
-		$("#hint").html((errorMessage.length !== 0 ? errorMessage + "<br/>" : "") + 
-			(formatMessage.length !== 0 ? formatMessage + "<br/>" : "") +
-			(workingOnMessage.length !== 0 ? workingOnMessage + "<br/>" : "") + 
-			(modeMessage.length !== 0 ? modeMessage + "<br/>" : "") + generalMessage);
+		$("#hint").html((errorMessage !== undefined && errorMessage.length !== 0 ? errorMessage + "<br/>" : "") + 
+			(formatMessage !== undefined && formatMessage.length !== 0 ? formatMessage + "<br/>" : "") +
+			(workingOnMessage !== undefined && workingOnMessage.length !== 0 ? workingOnMessage + "<br/>" : "") + 
+			(modeMessage !== undefined && modeMessage.length !== 0 ? modeMessage + "<br/>" : "") + generalMessage);
 	}
 	
 	return {
