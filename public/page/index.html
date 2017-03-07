@@ -380,7 +380,7 @@
 							}
 							
 							//Update backup context and reset bool
-							obj = updateECContext({circuit, edgesVisited, matrix, unusedEdges, start, last, GRAPH: JSON.stringify(GRAPH)});
+							obj = copyECContext({circuit, edgesVisited, matrix, unusedEdges, start, last, GRAPH: JSON.stringify(GRAPH)});
 							firstOpportunity = false;
 							potential = false;
 						}
@@ -445,7 +445,7 @@
 							
 							//Update backup context and reset bool
 							firstOpportunity = false;
-							obj = updateECContext({circuit, edgesVisited, matrix, unusedEdges, start, last, GRAPH: JSON.stringify(GRAPH)});
+							obj = copyECContext({circuit, edgesVisited, matrix, unusedEdges, start, last, GRAPH: JSON.stringify(GRAPH)});
 							potential = false;
 						}
 						
@@ -480,12 +480,12 @@
 						
 						//Update backup context and reset bool
 						firstOpportunity = false;
-						obj = updateECContext({circuit, edgesVisited, matrix, unusedEdges, start, last, GRAPH: JSON.stringify(GRAPH)});
+						obj = copyECContext({circuit, edgesVisited, matrix, unusedEdges, start, last, GRAPH: JSON.stringify(GRAPH)});
 						
 						//This is the eulerian circuit
 						if(start === null) {
 							circuit.push(last);
-							obj = updateECContext({circuit, edgesVisited, matrix, unusedEdges, start, last, GRAPH: JSON.stringify(GRAPH)});
+							obj = copyECContext({circuit, edgesVisited, matrix, unusedEdges, start, last, GRAPH: JSON.stringify(GRAPH)});
 							self.postMessage(ECReport(obj,"Complete"));
 							return;
 						}
@@ -503,7 +503,7 @@
 							circuit.push(circuit.shift());
 						}
 						circuit.push(last);
-						obj = updateECContext({circuit, edgesVisited, matrix, unusedEdges, start, last, GRAPH: JSON.stringify(GRAPH)});
+						obj = copyECContext({circuit, edgesVisited, matrix, unusedEdges, start, last, GRAPH: JSON.stringify(GRAPH)});
 					}
 				}
 				//Hamiltonian Cycle
@@ -633,24 +633,22 @@
 							//Discount invalid paths (not adjacent or already on path)
 							if(matrix[path[path.length - 1]][GRAPH.nodes[i].id] !== null && 
 							!nodesVisited.includes(GRAPH.nodes[i].id)) {
-								console.log(matrix[path[path.length - 1]][GRAPH.nodes[i].id] + " " + path[path.length - 1] + " " + GRAPH.nodes[i].id);
 								
 								//Update current context to continue
 								if(firstOpportunity === false) {
-									console.log(path);
+									
 									path.push(GRAPH.nodes[i].id);
 									nodesVisited.push(GRAPH.nodes[i].id);
-									console.log(path);
+									
 									firstOpportunity = true;
 									potential = true;
 								}
 								//Copy backup context and update for new path and queue it up
 								else {
 									newContext = copyHPContext(obj);
-									console.log(newContext.path);
+									
 									newContext.path.push(GRAPH.nodes[i].id);
 									newContext.nodesVisited.push(GRAPH.nodes[i].id);
-									console.log(newContext.path);
 									
 									self.postMessage(HPReport(newContext, "Incomplete"));
 								}
@@ -845,18 +843,6 @@
 					matrix: obj.matrix,
 					GRAPH: obj.GRAPH,
 					colors: obj.colors
-				};
-			}
-			
-			function updateECContext(obj) {
-				return {
-					circuit: obj.circuit.slice(),
-					edgesVisited: obj.edgesVisited.slice(),
-					unusedEdges: obj.unusedEdges.slice(),
-					start:  obj.start,
-					last:  obj.last,
-					matrix: obj.matrix,
-					GRAPH: obj.GRAPH
 				};
 			}
 			

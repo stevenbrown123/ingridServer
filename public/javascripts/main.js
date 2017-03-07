@@ -3916,6 +3916,7 @@ function submitSetMode() {
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
 	ANIMATIONCONTROL.hideButtons();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.hideColorPicker();
 	ANIMATIONCONTROL.hidePreSelectButton();
 	mode = "submitSetMode";
@@ -3926,6 +3927,7 @@ function submitSeqMode() {
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
 	ANIMATIONCONTROL.hideButtons();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.hideColorPicker();
 	ANIMATIONCONTROL.hidePreSelectButton();
 	mode = "submitSeqMode";
@@ -3937,6 +3939,7 @@ function drawNodeMode() {
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
 	ANIMATIONCONTROL.hideButtons();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.hideColorPicker();
 	ANIMATIONCONTROL.hidePreSelectButton();
 	mode = "drawNode";
@@ -3949,6 +3952,7 @@ function drawEdgeMode() {
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
 	ANIMATIONCONTROL.hideButtons();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.hideColorPicker();
 	ANIMATIONCONTROL.hidePreSelectButton();
 	mode = "drawEdge";
@@ -3959,6 +3963,7 @@ function deleteNodeMode() {
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.hideButtons();
 	ANIMATIONCONTROL.hideColorPicker();
 	ANIMATIONCONTROL.hidePreSelectButton();
@@ -3970,6 +3975,7 @@ function deleteEdgeMode() {
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.hideButtons();
 	ANIMATIONCONTROL.hideColorPicker();
 	ANIMATIONCONTROL.hidePreSelectButton();
@@ -3980,6 +3986,7 @@ function moveNodeMode() {
 	resetSelection();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.hideButtons();
 	ANIMATIONCONTROL.hideColorPicker();
 	ANIMATIONCONTROL.hidePreSelectButton();
@@ -3993,6 +4000,7 @@ function renameNodeMode() {
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.hideButtons();
 	ANIMATIONCONTROL.hideColorPicker();
 	ANIMATIONCONTROL.hidePreSelectButton();
@@ -4004,6 +4012,7 @@ function clearGraphAct() {
 	ANIMATIONCONTROL.skipAnimation();
 	GRAPHDRAWER.clearGraph();
 	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.hideButtons();
 	ANIMATIONCONTROL.hideColorPicker();
 	ANIMATIONCONTROL.hidePreSelectButton();
@@ -4015,6 +4024,7 @@ function edgeContractionMode() {
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.hideButtons();
 	ANIMATIONCONTROL.hideColorPicker();
 	ANIMATIONCONTROL.hidePreSelectButton();
@@ -4025,6 +4035,7 @@ function complementAct() {
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.hideButtons();
 	ANIMATIONCONTROL.hideColorPicker();
 	ANIMATIONCONTROL.hidePreSelectButton();
@@ -4041,6 +4052,7 @@ function eulerianCycleMode() {
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.showButtons();
 	ANIMATIONCONTROL.swapButtons();
 	ANIMATIONCONTROL.hideColorPicker();
@@ -4058,6 +4070,7 @@ function hamiltonianCycleMode() {
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.showButtons();
 	ANIMATIONCONTROL.swapButtons();
 	ANIMATIONCONTROL.hideColorPicker();
@@ -4073,6 +4086,7 @@ function hamiltonianPathMode() {
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.showButtons();
 	ANIMATIONCONTROL.swapButtons();
 	ANIMATIONCONTROL.hideColorPicker();
@@ -4088,13 +4102,14 @@ function graphColorMode() {
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.showButtons();
 	ANIMATIONCONTROL.swapButtons();
 	ANIMATIONCONTROL.showColorPicker();
 	ANIMATIONCONTROL.hidePreSelectButton();
 	mode = "graphColorMode";
 }
-	
+
 //Resets selections
 function resetSelection() {
 	if(SELECTED1 !== null) {
