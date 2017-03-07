@@ -755,7 +755,7 @@ var edgeContraction = function() {
 	const ITERATIONS = ANIMATION_TIME/TIME_BT_FRAMES;
 	
 	var timeouts = [];
-	var doing = false;;
+	var doing = false;
 	
 	var node1;
 	var node2;
@@ -774,6 +774,7 @@ var edgeContraction = function() {
 
 	//Visually outputs teh result
 	var main = function(n1, n2) {
+		doing = true;
 		node1 = scene.getObjectById(n1);
 		node2 = scene.getObjectById(n2);
 		
@@ -831,7 +832,6 @@ var edgeContraction = function() {
 		node.position.set(vector.x, vector.y, NODE_LAYER);
 		
 		GRAPHDRAWER.repositionEdges(node);
-		doing = false;
 	}
 	//Updates the actual graph
 	var updateGraph = function(n1, n2, vector) {
@@ -842,6 +842,8 @@ var edgeContraction = function() {
 		if(doing === false) {
 			return;
 		}
+		
+		doing = false;
 		
 		//Grabs all edges of the old nodes
 		edgeList = GRAPH.findEdges(n1.id, true);
