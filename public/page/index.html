@@ -236,6 +236,7 @@
 							<button type="button" class="btn btn-default" onclick="complementAct()">Complement</button>
 							<button type="button" class="btn btn-default" onclick="">Planarity</button>
 							<button type="button" class="btn btn-default" onclick="eulerianCycleMode()">Eulerian Cycles</button>
+							<button type="button" class="btn btn-default" onclick="eulerianPathMode()">Eulerian Paths</button>
 							<button type="button" class="btn btn-default" onclick="hamiltonianCycleMode()">Hamiltonian Cycles</button>
 							<button type="button" class="btn btn-default" onclick="hamiltonianPathMode()">Hamiltonian Paths</button>
 							<button type="button" class="btn btn-default" onclick="graphColorMode()">Graph Coloring</button>
@@ -329,32 +330,34 @@
 				
 				if(obj.type === "EC") {
 				
-					//Backup context
+					//Grab the context
 					backUpContext = obj.context;
 					backUpContext = unwrap(backUpContext);
 					
-					//Create current context
+					//Set up this path's context
 					currentContext = copyECContext(backUpContext);
 				
 					//This condition should never be false
 					while(true) {
 						//Either new or a mini cycle was completed, so start off the next cycle
 						if(backUpContext.start === backUpContext.last) {
+							
 							//Explore the leftover adjacent edges
 							for(var i = 0; i < backUpContext.GRAPH.nodes.length; i++) {
+							
 								if(backUpContext.matrix[backUpContext.start][backUpContext.GRAPH.nodes[i].id] !== null 
-								&& !edgesVisited.includes(matrix[start][GRAPH.nodes[i].id])) {
+								&& !backUpContext.edgesVisited.includes(backUpContext.matrix[backUpContext.start][backUpContext.GRAPH.nodes[i].id])) {
 									
 									potential = true;
 									//Update current context to continue
 									if(firstOpportunity === false) {
-										currentContext.circuit.push(GRAPH.nodes[i].id);
-										currentContext.last = GRAPH.nodes[i].id;
-										currentContext.unusedEdges[start] = currentContext.unusedEdges[start] === undefined || 
+										currentContext.circuit.push(backUpContext.GRAPH.nodes[i].id);
+										currentContext.last = backUpContext.GRAPH.nodes[i].id;
+										currentContext.unusedEdges[currentContext.start] = currentContext.unusedEdges[currentContext.start] === undefined || 
 											currentContext.unusedEdges[currentContext.start] === null ? 
 											currentContext.GRAPH.nodes[findIndexOfNode(currentContext.GRAPH.nodes, currentContext.start)].degree - 1 : 
 											currentContext.unusedEdges[currentContext.start] - 1;
-										currentContext.unusedEdges[last] = currentContext.unusedEdges[last] === undefined || 
+										currentContext.unusedEdges[currentContext.last] = currentContext.unusedEdges[currentContext.last] === undefined || 
 											currentContext.unusedEdges[currentContext.last] === null ? 
 											currentContext.GRAPH.nodes[findIndexOfNode(currentContext.GRAPH.nodes, currentContext.last)].degree - 1 : 
 											currentContext.unusedEdges[currentContext.last] - 1;
@@ -364,8 +367,8 @@
 									//Copy backup context and update for new path and queue it up
 									else {
 										newContext = copyECContext(backUpContext);
-										newContext.circuit.push(newContext.GRAPH.nodes[i].id);
-										newContext.last = newContext.GRAPH.nodes[i].id;
+										newContext.circuit.push(backUpContext.GRAPH.nodes[i].id);
+										newContext.last = backUpContext.GRAPH.nodes[i].id;
 										newContext.unusedEdges[newContext.start] = newContext.unusedEdges[newContext.start] === 
 											undefined || newContext.unusedEdges[newContext.start] === null ? 
 											newContext.GRAPH.nodes[findIndexOfNode(newContext.GRAPH.nodes, newContext.start)].degree - 1 : 
@@ -382,6 +385,7 @@
 							}
 							
 							if(potential === false) {
+								console.log(backUpContext);
 								return;
 							}
 							
@@ -395,25 +399,27 @@
 						while(backUpContext.start !== backUpContext.last) {
 							//Chooses next node, checks if the start is encountered or not
 							for(var i = 0; i < backUpContext.GRAPH.nodes.length; i++) {
-								if(currentContext.matrix[currentContext.last][currentContext.GRAPH.nodes[i].id] !== null 
-								&& currentContext.start === currentContext.GRAPH.nodes[i].id 
-								&& !currentContext.edgesVisited.includes(matrix[currentContext.last][currentContext.GRAPH.nodes[i].id])) {
+								if(backUpContext.matrix[backUpContext.last][backUpContext.GRAPH.nodes[i].id] !== null 
+								&& backUpContext.start === backUpContext.GRAPH.nodes[i].id 
+								&& !backUpContext.edgesVisited.includes(backUpContext.matrix[backUpContext.last][backUpContext.GRAPH.nodes[i].id])) {
 									
 									potential = true;
 									
 									if(firstOpportunity === false) {
-										currentContext.edgesVisited.push(matrix[currentContext.last][currentContext.GRAPH.nodes[i].id]);
+										currentContext.edgesVisited.push(currentContext.matrix[currentContext.last][backUpContext.GRAPH.nodes[i].id]);
 										currentContext.unusedEdges[currentContext.last]--;
 										currentContext.unusedEdges[currentContext.start]--;
 										currentContext.last = currentContext.start;
 										firstOpportunity = true;
 									}
 									else {
-										newContext = copyECContext(currentContext);
-										newContext.edgesVisited.add(matrix[newContext.last][newContext.GRAPH.nodes[i].id]);
-										newContext.last = newContext.start;
-										newContext.unusedEdges[newContext.circuit[newContext.circuit.length - 1]]--;
+										newContext = copyECContext(backUpContext);
+										newContext.edgesVisited.push(matrix[newContext.last][backUpContext.GRAPH.nodes[i].id]);
+										newContext.unusedEdges[newContext.last]--;
 										newContext.unusedEdges[newContext.start]--;
+										newContext.last = newContext.start;
+										
+										self.postMessage(ECReport(wrap(newContext), "Incomplete"));
 									}
 								}
 								else if(backUpContext.matrix[backUpContext.last][backUpContext.GRAPH.nodes[i].id] !== null 
@@ -422,24 +428,26 @@
 									potential = true;
 								
 									if(firstOpportunity === false) {
-										currentContext.edgesVisited.push(currentContext.matrix[currentContext.last][currentContext.GRAPH.nodes[i].id]);
-										currentContext.last = currentContext.currentContext.GRAPH.nodes[i].id;
+										currentContext.edgesVisited.push(currentContext.matrix[currentContext.last][backUpContext.GRAPH.nodes[i].id]);
+										currentContext.last = backUpContext.GRAPH.nodes[i].id;
 										currentContext.circuit.push(currentContext.last);
 										currentContext.unusedEdges[currentContext.last] = currentContext.unusedEdges[currentContext.last] === 
 											undefined || currentContext.unusedEdges[currentContext.last] === null ? 
-											currentContext.GRAPH.nodes[findIndexOfNode(currentContext.GRAPH.nodes, currentContext.last)].degree - 1 : 
+											currentContext.GRAPH.nodes[findIndexOfNode(backUpContext.GRAPH.nodes, currentContext.last)].degree - 1 : 
 											currentContext.unusedEdges[currentContext.last] - 1;
 										currentContext.unusedEdges[currentContext.circuit[currentContext.circuit.length - 2]]--;
 										
 										firstOpportunity = true;
 									}
 									else {
-										newContext = copyECContext(currentContext);
-										newContext.edgesVisited.push(matrix[newContext.last][GRAPH.nodes[i].id]);
-										newContext.last = GRAPH.nodes[i].id;
+										newContext = copyECContext(backUpContext);
+										newContext.edgesVisited.push(newContext.matrix[newContext.last][backUpContext.GRAPH.nodes[i].id]);
+										newContext.last = backUpContext.GRAPH.nodes[i].id;
 										newContext.circuit.push(newContext.last);
-										newContext.unusedEdges[newContext.last] = newContext.unusedEdges[newContext.last] === undefined || newContext.unusedEdges[newContext.last] ===
-											null ? GRAPH.nodes[findIndexOfNode(GRAPH.nodes, newContext.last)].degree - 1 : newContext.unusedEdges[newContext.last] - 1;
+										newContext.unusedEdges[newContext.last] = newContext.unusedEdges[newContext.last] === 
+											undefined || newContext.unusedEdges[newContext.last] === null ? 
+											newContext.GRAPH.nodes[findIndexOfNode(backUpContext.GRAPH.nodes, newContext.last)].degree - 1 : 
+											newContext.unusedEdges[newContext.last] - 1; 
 										newContext.unusedEdges[newContext.circuit[newContext.circuit.length - 2]]--;
 										
 										self.postMessage(ECReport(wrap(newContext), "Incomplete"));
@@ -448,6 +456,7 @@
 							}
 							
 							if(potential === false) {
+								console.log(backUpContext);
 								return;
 							}
 							
@@ -457,7 +466,7 @@
 							potential = false;
 						}
 						
-						start = null;
+						currentContext.start = null;
 						
 						//Finds nodes with unused edges
 						for(var i = 0; i < backUpContext.GRAPH.nodes.length; i++) {
@@ -476,7 +485,7 @@
 									newContext = copyECContext(backUpContext);
 									newContext.start = newContext.last = newContext.GRAPH.nodes[i].id;
 									
-									while(newContext.start != newContext.circuit[0]) {
+									while(newContext.start !== newContext.circuit[0]) {
 										newContext.circuit.push(newContext.circuit.shift());
 									}
 									newContext.circuit.push(newContext.last);
@@ -493,14 +502,16 @@
 						//This is the eulerian circuit
 						if(currentContext.start === null) {
 							currentContext.circuit.push(currentContext.last);
-							backUpContext = copyECContext(currentContext);
 							self.postMessage(ECReport(wrap(currentContext),"Complete"));
+							
+							console.log(currentContext.circuit);
 							return;
 						}
 						
-						//This should never occur. According to the logic, the algorithm should always succceeds.
+						//This should never occur. According to the logic, the algorithm should always succceed.
 						if(potential === false) {
 							console.log("major error");
+							console.log(backUpContext);
 							return;
 						}
 						

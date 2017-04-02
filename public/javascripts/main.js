@@ -173,6 +173,9 @@ var webWorkerManager = function() {
 			if(data.type === "EC") {
 				EULERIANCYCLE.checkNewSolution(data.context.circuit);
 			}
+			else if(data.type === "EP") {
+				EULERIANPATH.checkNewSolution(data.context.circuit);
+			}
 			else if(data.type === "HC") {
 				HAMILTONIANCYCLE.checkNewSolution(data.context.circuit);
 			}
@@ -289,6 +292,9 @@ var animationControl = function() {
 		else if(mode === "eulerianCycleMode") {
 			EULERIANCYCLE.skipAnimation();
 		}
+		else if(mode === "eulerianPathMode") {
+			EULERIANPATH.skipAnimation();
+		}
 		else if(mode === "hamiltonianCycleMode") {
 			HAMILTONIANCYCLE.skipAnimation();
 		}
@@ -299,6 +305,9 @@ var animationControl = function() {
 	var nextAnimation = function() {
 		if(mode === "eulerianCycleMode") {
 			EULERIANCYCLE.nextSolution();
+		}
+		else if(mode === "eulerianPathMode") {
+			EULERIANPATH.nextSolution();
 		}
 		else if(mode === "hamiltonianCycleMode") {
 			HAMILTONIANCYCLE.nextSolution();
@@ -314,6 +323,9 @@ var animationControl = function() {
 		if(mode === "eulerianCycleMode") {
 			EULERIANCYCLE.prevSolution();
 		}
+		else if(mode === "eulerianPathMode") {
+			EULERIANPATH.prevSolution();
+		}
 		else if(mode === "hamiltonianCycleMode") {
 			HAMILTONIANCYCLE.prevSolution();
 		}
@@ -328,6 +340,9 @@ var animationControl = function() {
 		if(mode === "eulerianCycleMode") {
 			EULERIANCYCLE.replaySolution();
 		}
+		else if(mode === "eulerianPathMode") {
+			EULERIANPATH.replaySolution();
+		}
 		else if(mode === "hamiltonianCycleMode") {
 			HAMILTONIANCYCLE.replaySolution();
 		}
@@ -339,6 +354,9 @@ var animationControl = function() {
 	var cleanUpAnimation = function() {
 		if(mode === "eulerianCycleMode") {
 			EULERIANCYCLE.cleanUpAnimation();
+		}
+		else if(mode === "eulerianPathMode") {
+			EULERIANPATH.cleanUpAnimation();
 		}
 		else if(mode === "hamiltonianCycleMode") {
 			HAMILTONIANCYCLE.cleanUpAnimation();
@@ -385,6 +403,9 @@ var animationControl = function() {
 		}
 		else if(mode === "eulerianCycleMode") {
 			EULERIANCYCLE.main();
+		}
+		else if(mode === "eulerianPathMode") {
+			EULERIANPATH.main();
 		}
 	}	
 	var prevColor = function() {
@@ -499,6 +520,7 @@ var animationControl = function() {
 		$("#go").css( "left", $("#renderer").width() - $("#go").width() - MARGIN*2 );
 		
 		if(mode !== "eulerianCycleMode"
+		&& mode !== "eulerianPathMode"
 		&& mode !== "hamiltonianCycleMode"
 		&& mode !== "hamiltonianPathMode"
 		&& mode !== "graphColorMode") {
@@ -509,7 +531,8 @@ var animationControl = function() {
 		}
 		if(mode !== "hamiltonianPathMode"
 		&& mode !== "hamiltonianCycleMode"
-		&& mode !== "eulerianCycleMode") {
+		&& mode !== "eulerianCycleMode"
+		&& mode !== "eulerianPathMode") {
 			hidePreSelectButton();
 		}
 	}	
@@ -528,6 +551,7 @@ var animationControl = function() {
 	
 	var clearAllSolutions = function() {
 		EULERIANCYCLE.clearSolutions();
+		EULERIANPATH.clearSolutions();
 		HAMILTONIANCYCLE.clearSolutions();
 		HAMILTONIANPATH.clearSolutions();
 		GRAPHCOLOR.clearSolutions();
@@ -1152,8 +1176,8 @@ var eulerianCycle = function() {
 			last = preSelectNodeList[preSelectNodeList.length - 1];
 		}
 		else {
-			start = -1;
-			last = -1;
+			start = GRAPH.nodes[0].getId();
+			last = GRAPH.nodes[0].getId();
 		}
 		
 		for(var i = 0; i < preSelectList.length; i++) {
@@ -1166,20 +1190,6 @@ var eulerianCycle = function() {
 				unusedEdges[nodesForEdge[1]] === null ? GRAPH.findNode(nodesForEdge[1]).getDegree() - 1 : 
 				unusedEdges[nodesForEdge[1]] - 1;
 		}
-		
-		var context = {
-			circuit: preSelectNodeList,
-			edgesVisited: preSelectList,
-			unusedEdges: unusedEdges,
-			start: start,
-			last: last,
-			matrix: matrix,
-			GRAPH: GRAPH.toStringJ()
-		}
-		
-		console.log(context);
-		
-		return;
 		
 		WEBWORKERMANAGER.enlistWebWorker(JSON.stringify({
 			type: "EC",
@@ -1529,6 +1539,498 @@ var eulerianCycle = function() {
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////                  End Eulerian Cycle                                   //////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////                   ~Eulerian Path ~                                    //////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+/*	Eulerian Cycle
+
+	Handles the Eularian Cycle function and deals with its animation
+	Currently only visually outputs one cycle
+	
+	Public Methods:
+	main - visually outputs the answer
+	resetArrows - cleans up the drawing
+*/
+var eulerianPath = function() {
+	const ANIMATION_TIME = 2000;
+	const ITERATIONS = ANIMATION_TIME/TIME_BT_FRAMES;//splits frames 
+	const ARROW_COLOR = 0xff0000;
+	const ARROW_LAYER = 0; //Keep at this value, it won't appear otherwise
+	const HEAD_LENGTH = 20;
+	const HEAD_WIDTH = 10;
+	const ORDER_TEXT_COLOR = 'white';
+	const ORDER_TEXT_DISTANCE_Y = 45;
+	
+	var doing = false;
+	
+	var timeout = [];	
+	var solutions = [];
+	var currSol = 0;
+	var animationObjects = [];
+	var orderTexts = [];
+	var animationParameters = [];
+	
+	var preSelectList = [];
+	var preSelectLabels =[];
+	var preSelectNodeList = [];
+	const PRESELECT_LABEL_COLOR = 'red';
+	
+	var actualIterations; //correction of ITERATIONS
+	var matrix;
+	
+	var timeouts = [];//Animation that is still animating
+	
+	//Visually outputs answer
+	var main = function() {
+		if(solutions.length === 0) {
+			
+			ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
+			
+			//Checks all qualifiying criteria
+			if(GRAPH.edges.length == 0) {
+				return [];
+			}	
+			if(!twoOrZeroOddDegrees()) {
+				return false;
+			}
+			
+			matrix = UTILS.setUpMatrixId();
+			
+			if(!allNonZeroDegreeConnected()) {
+				return false;
+			}
+			
+			enlistWebWorkers();
+		}
+		else {
+			animationSetUp();
+			ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
+		}
+		
+		return;
+	}
+	
+	//Criteria for eularian path
+	var twoOrZeroOddDegrees = function() {
+		var count = 0;
+		
+		for(var i = 0; i < GRAPH.nodes.length; i++) {
+			if(GRAPH.nodes[i].getDegree() % 2 == 1) {
+				count++;
+			}
+		}
+		return count === 0 || count === 2;
+	}
+	//Criteria for eularian cycle
+	var allNonZeroDegreeConnected = function() {
+		var bool = true;//assume true
+		
+		var notVisited = new Set(GRAPH.nodes);
+		var next = [];
+		var start;
+		
+		var add = [];
+		var del = [];
+		var index;
+		
+		//Grabs the first connected node
+		for(var i = 0; i < GRAPH.nodes.length; i++) {
+			if(GRAPH.nodes[i].getDegree() != 0) {
+				start = GRAPH.nodes[i];
+			}
+		}
+		
+		//Grabs it's adjacent nodes
+		for(var i = 0; i < GRAPH.nodes.length; i++) {
+			if(matrix[start.getId()][GRAPH.nodes[i].getId()]) {
+				next.push(GRAPH.nodes[i]);
+			}
+		}
+		
+		notVisited.delete(start);
+		
+		//BFS
+		while(next.length > 0) {
+			
+			for(var i = 0; i < next.length; i++) {
+				notVisited.delete(next[i]);
+			}
+
+			for(var i = 0; i < next.length; i++) {
+				
+				for(var j = 0; j < GRAPH.nodes.length; j++) {
+					if(matrix[next[i].getId()][GRAPH.nodes[j].getId()] 
+					&& notVisited.has(GRAPH.nodes[j])
+					&& !add.includes(GRAPH.nodes[j])) {
+						add.push(GRAPH.nodes[j]);
+					}
+				}
+				
+				del.push(next[i]);
+			}
+
+			for(var i = 0; i < del.length; i++) {
+				index = next.indexOf(del[i]);
+				next.splice(index, 1);
+			}
+			
+			del = [];
+			
+			for(var i = 0; i < add.length; i++) {
+				next.push(add[i]);
+			}
+			
+			add = [];
+		}
+		
+		//Conncected nodes that have not been visited
+		notVisited.forEach(function(val){
+			if(val.getDegree() != 0) {
+				bool = false;
+			}
+		});
+		
+		return bool;		
+	}
+	
+	var enlistWebWorkers = function() {
+	
+		console.log(preSelectList);
+		return;
+	
+		WEBWORKERMANAGER.enlistWebWorker(JSON.stringify({
+			type: "EC",
+			context: {
+				path: preSelectList,
+				matrix: matrix,
+				GRAPH: GRAPH.toStringJ()
+			}
+		}));
+	}
+	
+	var createOrderTextBoxes = function(solution) {
+		var obj;
+		var orderPlane;
+		
+		console.log(solution)
+		
+		for(var i = 0; i < solution.length; i++) {
+			orderPlane = UTILS.createLabel(i.toString(), ORDER_TEXT_COLOR);
+			obj = scene.getObjectById(solution[i]);
+			
+			orderPlane.position.set(obj.position.x, obj.position.y + ORDER_TEXT_DISTANCE_Y, LABEL_LAYER);
+			scene.add(orderPlane);
+			orderTexts.push(orderPlane);
+		}
+	}
+	
+	var checkNewSolution = function(newSolution) {
+		clearPreselect();
+		
+		for(var i = 0; i < solutions.length; i++) {
+			if(rotateSolutionCheck(newSolution, solutions[i])) {
+				return;
+			}
+		}		
+		
+		solutions.push(newSolution);
+		ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
+	}
+	
+	var rotateSolutionCheck = function(newSolution, solution) {
+		for(var i = 0; i < newSolution.length - 1; i++) {
+			newSolution.shift();
+			newSolution.push(newSolution[0]);
+			
+			if(matchSolutions(newSolution, solution)) {
+				return true;
+			}
+		}
+		
+		return false;
+	}
+	
+	var matchSolutions = function(newSolution, solution) {
+		for(var i = 0; i < newSolution.length; i++) {
+			if(newSolution[i] !== solution[i]) {
+				return false;
+			}
+		}
+		return true;
+	}
+	
+	//Animation where the arrows are drawn out incrementally starting with the first edge to the last in the circuit
+	var animationSetUp = function() {
+		if(solutions.length === 0) {
+			return;
+		}
+		
+		ANIMATIONCONTROL.swapButtons(true);
+		
+		var circuit = [];
+		for(var i = 0; i < solutions[currSol].length; i++) {
+			circuit.push(solutions[currSol][i]);
+		}
+		
+		createOrderTextBoxes(solutions[currSol]);
+		
+		var iterationsPerEdge = ITERATIONS/(circuit.length - 1);
+		var endPoints = [];
+		var directionVectors = [];
+		var finalLengths = [];
+		
+		//Collects the endpoints for the arrows
+		for(var i = 0; i < circuit.length; i++) {
+			endPoints.push(scene.getObjectById(circuit[i]).position);
+		}
+		//Finds the required length of the arrows, and directions
+		for(var i = 0; i < endPoints.length - 1; i++) {
+			finalLengths.push(new THREE.Vector3(endPoints[i + 1].x - endPoints[i].x, endPoints[i + 1].y - endPoints[i].y, 0));
+			directionVectors.push(new THREE.Vector3(1,1,1));
+			directionVectors[i].copy(finalLengths[i]);
+			directionVectors[i].normalize();
+			finalLengths[i] = Math.sqrt(Math.pow(finalLengths[i].x, 2) + Math.pow(finalLengths[i].y, 2));
+		}
+		
+		iterationsPerEdge = Math.ceil(iterationsPerEdge);
+		actualIterations = iterationsPerEdge * directionVectors.length;//actual total iterations
+		
+		animationParameters[currSol] = {endPoints: endPoints,
+			directionVectors: directionVectors,
+			finalLengths: finalLengths};
+		
+		//Set up for animation
+		for(var i = 0; i < actualIterations; i++) {
+			
+			timeouts.push((function(i) {
+				setTimeout(function() {
+	
+				animation(endPoints[Math.floor(i/iterationsPerEdge)], 
+				directionVectors[Math.floor(i/iterationsPerEdge)], 
+				finalLengths[Math.floor(i/iterationsPerEdge)] * (i % iterationsPerEdge / iterationsPerEdge),
+				Math.floor(i/iterationsPerEdge));
+			
+				}, (i + 1)*TIME_BT_FRAMES);
+			})(i));
+		}
+		
+		timeouts.push(setTimeout(function() {
+			
+			animationComplete(endPoints, directionVectors, finalLengths);
+			
+		}, (actualIterations + 1)*TIME_BT_FRAMES ));
+	}
+	//Draws the arrows incrementally, and replaces an old arrow when appropriate
+	var animation = function(orig, dir, length, i) {
+		if(animationObjects[i] === undefined) {
+			animationObjects[i] = new THREE.ArrowHelper( dir, orig, length, ARROW_COLOR , HEAD_LENGTH, HEAD_LENGTH  )
+			scene.add( animationObjects[i] )
+		}
+		else {
+			scene.remove( animationObjects[i] );
+			animationObjects[i] = new THREE.ArrowHelper( dir, orig, length, ARROW_COLOR , HEAD_LENGTH, HEAD_LENGTH  )
+			scene.add( animationObjects[i] )
+		}
+	}
+	//Final visual
+	var animationComplete = function(endPoints, directionVectors, finalLengths) {
+		
+		for(var i = 0; i < directionVectors.length; i++) {
+			scene.remove( animationObjects[i] );
+			animationObjects[i] = new THREE.ArrowHelper( directionVectors[i], endPoints[i], finalLengths[i], ARROW_COLOR , HEAD_LENGTH, HEAD_LENGTH  );
+			scene.add( animationObjects[i] );
+		}
+		ANIMATIONCONTROL.swapButtons(false);
+	}
+	//Skip the animation
+	var skipAnimation = function() {
+		for(var i = 0; i < timeouts.length; i++) {
+			clearTimeout(timeouts[i]);
+		}
+		timeouts = [];
+		cleanUpAnimation();
+		
+		if(solutions.length !== 0) {
+			animationComplete(animationParameters[currSol].endPoints,
+			animationParameters[currSol].directionVectors,
+			animationParameters[currSol].finalLengths);
+		}
+	}
+	//Clear the animation
+	var cleanUpAnimation = function(){
+		clearPreselect();
+		for(var i = 0; i < animationObjects.length; i++) {
+			scene.remove(animationObjects[i]);
+		}
+		for(var i = 0; i < orderTexts.length; i++) {
+			scene.remove(orderTexts[i]);
+		}
+		animationObjects = [];
+		orderTexts = [];
+	}
+	var clearSolutions = function() {
+		currSol = 0;
+		solutions = [];
+	}
+	
+	var nextSolution = function() {
+		if(solutions.length === 0) {
+			return;
+		}
+		
+		cleanUpAnimation();
+		currSol = (currSol + 1)%solutions.length;
+		animationSetUp();
+		ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
+	}
+	var prevSolution = function() {
+		if(solutions.length === 0) {
+			return;
+		}
+		
+		cleanUpAnimation();
+		currSol = ((currSol - 1 >= 0)? currSol - 1 : solutions.length - 1)%solutions.length;
+		animationSetUp();
+		ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
+	}
+	var replaySolution = function() {
+		if(solutions.length === 0) {
+			return;
+		}
+		
+		cleanUpAnimation();
+		animationSetUp();
+	}
+	
+	var preselect = function(id) {
+		var myLabel;
+		var obj;
+		var index;
+		var objToRemove;
+		
+		//Deconstruct the last part of the path
+		if(preSelectList.includes(id)) {
+			index = preSelectList.indexOf(id);
+			
+			for(var i = index; i <preSelectList.length;) {
+				preSelectList.splice(index, 1);
+			}
+			
+			for(var i = index; i < preSelectLabels.length; ) {
+				scene.remove(preSelectLabels[i]);
+				preSelectLabels.splice(i, 1);
+			}
+			
+			if(preSelectList.length === 0) {
+				preSelectNodeList = [];
+			}
+			else {
+				for(var i = preSelectList.length + 1; i < preSelectNodeList.length; ) {
+					preSelectNodeList.splice(i, 1);
+				}
+			}
+		}
+		else {
+			if(!validateSelection(id)) {
+				HINTBOX.setErrorMessage("The edge you selected is invalid.");
+				return;
+			}
+			
+			HINTBOX.setErrorMessage("");
+			
+			preSelectList.push(id);
+			
+			myLabel = UTILS.createLabel(preSelectList.length.toString(), PRESELECT_LABEL_COLOR);
+			obj = scene.getObjectById(id);
+			
+			myLabel.position.set(obj.position.x, obj.position.y, LABEL_LAYER);
+			
+			preSelectLabels.push(myLabel);
+			scene.add(myLabel);
+		}
+		
+		WEBWORKERMANAGER.restart();
+		ANIMATIONCONTROL.updateCounter();
+		clearSolutions();
+	}
+	
+	var clearPreselect = function() {
+		for(var i = 0; i < preSelectList.length; ) {
+			scene.remove(preSelectLabels[i]);
+			preSelectLabels.splice(i, 1);
+			preSelectList.splice(i, 1);
+		}
+	}
+	
+	var validateSelection = function(id) {
+		var nodesForEdge1 = null;
+		var nodesForEdge2 = null;
+		var targetNode = null;
+		
+		if(preSelectList.length === 0) {
+			nodesForEdge1 = GRAPH.getNodesForEdge(id);
+			preSelectNodeList = [nodesForEdge1[0], nodesForEdge1[1]];
+			return true;
+		}
+		if(preSelectList.length === 1) {
+			nodesForEdge1 = GRAPH.getNodesForEdge(preSelectList[0]);
+			nodesForEdge2 = GRAPH.getNodesForEdge(id);
+			
+			if(nodesForEdge1[0] === nodesForEdge2[0]
+			|| nodesForEdge1[0] === nodesForEdge2[1]
+			|| nodesForEdge1[1] === nodesForEdge2[0]
+			|| nodesForEdge1[1] === nodesForEdge2[1]) {
+				return true;
+			}
+			
+			return false;
+		}
+		
+		nodesForEdge1 = GRAPH.getNodesForEdge(preSelectList[preSelectList.length - 1]);
+		nodesForEdge2 = GRAPH.getNodesForEdge(preSelectList[preSelectList.length - 2]);
+		
+		if(nodesForEdge1[0] === nodesForEdge2[0] ||
+		nodesForEdge1[0] === nodesForEdge2[1]) {
+			targetNode = nodesForEdge1[1];
+		}
+		else {
+			targetNode = nodesForEdge1[0];
+		}
+		
+		nodesForEdge2 = GRAPH.getNodesForEdge(id);
+		
+		if(targetNode === nodesForEdge2[0]) {
+			preSelectNodeList.push(nodesForEdge2[1]);
+			return true;
+		}
+		if(targetNode === nodesForEdge2[1]) {
+			preSelectNodeList.push(nodesForEdge2[0]);
+			return true;
+		}
+		
+		return false;
+	}
+	
+	return {
+		solutions: solutions,
+		currSol: currSol,
+		
+		doing: doing,
+		main: main,
+		skipAnimation: skipAnimation,
+		cleanUpAnimation: cleanUpAnimation,
+		nextSolution: nextSolution,
+		prevSolution: prevSolution,
+		replaySolution: replaySolution,
+		checkNewSolution: checkNewSolution,
+		clearSolutions: clearSolutions,
+		preselect: preselect
+	}
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////                  End Eularian Path                                    //////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3574,6 +4076,7 @@ var GRAPHPARSER = graphParser();
 var COMPLEMENT = complement();
 var EDGECONTRACTION = edgeContraction();
 var EULERIANCYCLE = eulerianCycle();
+var EULERIANPATH = eulerianPath();
 var HAMILTONIANCYCLE = hamiltonianCycle();
 var HAMILTONIANPATH = hamiltonianPath();
 var GRAPHCOLOR = graphColor();
@@ -3784,7 +4287,8 @@ $(document).ready(function(){
 		}
 		else if(mode == "hamiltonianPathMode"
 		|| mode === "hamiltonianCycleMode"
-		|| mode === "eulerianCycleMode") {
+		|| mode === "eulerianCycleMode"
+		|| mode === "eulerianPathMode") {
 			selectionList();
 		}
 	});
@@ -4086,6 +4590,9 @@ function selectionList() {
 		if(mode === "eulerianCycleMode") {
 			EULERIANCYCLE.preselect(INTERSECTED.id);
 		}
+		else if(mode === "eulerianPathMode") {
+			EULERIANPATH.preselect(INTERSECTED.id);
+		}
 	}
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -4242,7 +4749,22 @@ function eulerianCycleMode() {
 	ANIMATIONCONTROL.hideColorPicker();
 	ANIMATIONCONTROL.showPreSelectButton();
 	mode = "eulerianCycleMode";
-	//EULERIANCYCLE.main();
+}
+function eulerianPathMode() {
+	HINTBOX.setModeMessage("If you would like to narrow the search area, you can partially preselect your own path.<br>" +
+		"Click on the nodes in the order you would like them to be in path.<br/>" +
+		"Click on an already selected node to remove it from the path.</br>" +
+		"When you are ready, click GO, and we will try to build upon the path you have, if you put in any.");
+	resetSelection();
+	cleanUp();
+	ANIMATIONCONTROL.skipAnimation();
+	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.updateCounter();
+	ANIMATIONCONTROL.showButtons();
+	ANIMATIONCONTROL.swapButtons();
+	ANIMATIONCONTROL.hideColorPicker();
+	ANIMATIONCONTROL.showPreSelectButton();
+	mode = "eulerianPathMode";
 }
 function hamiltonianCycleMode() {
 	HINTBOX.setModeMessage("If you would like to narrow the search area, you can partially preselect your own path.<br>" +
