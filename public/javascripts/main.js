@@ -929,6 +929,10 @@ var eulerianCycle = function() {
 	var orderTexts = [];
 	var animationParameters = [];
 	
+	var preSelectList = [];
+	var preSelectLabels =[];
+	const PRESELECT_LABEL_COLOR = 'red';
+	
 	var actualIterations; //correction of ITERATIONS
 	var matrix;
 	
@@ -955,7 +959,9 @@ var eulerianCycle = function() {
 			}
 			
 			//The answer(s)
-			solutions.push(hierholzerAlgorithm());
+			//solutions.push(hierholzerAlgorithm());
+			
+			enlistWebWorkers();
 			
 			ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
 			animationSetUp();
@@ -1136,7 +1142,7 @@ var eulerianCycle = function() {
 		WEBWORKERMANAGER.enlistWebWorker(JSON.stringify({
 			type: "EC",
 			context: {
-				circuit: circuit,
+				circuit: [],
 				edgesVisited: Array.from(edgesVisited),
 				unusedEdges: unusedEdges,
 				start: start,
@@ -1164,7 +1170,7 @@ var eulerianCycle = function() {
 	}
 	
 	var checkNewSolution = function(newSolution) {
-		console.log(newSolution);
+		clearPreselect();
 		
 		for(var i = 0; i < solutions.length; i++) {
 			if(rotateSolutionCheck(newSolution, solutions[i])) {
@@ -1297,6 +1303,7 @@ var eulerianCycle = function() {
 	}
 	//Clear the animation
 	var cleanUpAnimation = function(){
+		clearPreselect();
 		for(var i = 0; i < animationObjects.length; i++) {
 			scene.remove(animationObjects[i]);
 		}
@@ -1340,6 +1347,102 @@ var eulerianCycle = function() {
 		animationSetUp();
 	}
 	
+	var preselect = function(id) {
+		var myLabel;
+		var obj;
+		var index;
+		var objToRemove;
+		
+		console.log(id);
+		
+		//Deconstruct the last part of the path
+		if(preSelectList.includes(id)) {
+			index = preSelectList.indexOf(id);
+			
+			for(var i = index; i <preSelectList.length;) {
+				preSelectList.splice(index, 1);
+			}
+			
+			for(var i = index; i < preSelectLabels.length; ) {
+				scene.remove(preSelectLabels[i]);
+				preSelectLabels.splice(i, 1);
+			}
+		}
+		else {
+			if(!validateSelection(id)) {
+				HINTBOX.setErrorMessage("The edge you selected is invalid.");
+				return;
+			}
+			
+			HINTBOX.setErrorMessage("");
+			
+			preSelectList.push(id);
+			
+			myLabel = UTILS.createLabel(preSelectList.length.toString(), PRESELECT_LABEL_COLOR);
+			obj = scene.getObjectById(id);
+			
+			myLabel.position.set(obj.position.x, obj.position.y, LABEL_LAYER);
+			
+			preSelectLabels.push(myLabel);
+			scene.add(myLabel);
+		}
+		
+		WEBWORKERMANAGER.restart();
+		ANIMATIONCONTROL.updateCounter();
+		clearSolutions();
+	}
+	
+	var clearPreselect = function() {
+		for(var i = 0; i < preSelectList.length; ) {
+			scene.remove(preSelectLabels[i]);
+			preSelectLabels.splice(i, 1);
+			preSelectList.splice(i, 1);
+		}
+	}
+	
+	var validateSelection = function(id) {
+		var nodesForEdge1 = null;
+		var nodesForEdge2 = null;
+		var targetNode = null;
+		
+		if(preSelectList.length === 0) {
+			return true;
+		}
+		if(preSelectList.length === 1) {
+			nodesForEdge1 = GRAPH.getNodesForEdge(preSelectList[0]);
+			nodesForEdge2 = GRAPH.getNodesForEdge(id);
+			
+			if(nodesForEdge1[0] === nodesForEdge2[0] ||
+			nodesForEdge1[0] === nodesForEdge2[1] ||
+			nodesForEdge1[1] === nodesForEdge2[0] ||
+			nodesForEdge1[1] === nodesForEdge2[1]) {
+				return true;
+			}
+			
+			return false;
+		}
+		
+		nodesForEdge1 = GRAPH.getNodesForEdge(preSelectList[preSelectList.length - 1]);
+		nodesForEdge2 = GRAPH.getNodesForEdge(preSelectList[preSelectList.length - 2]);
+		
+		if(nodesForEdge1[0] === nodesForEdge2[0] ||
+		nodesForEdge1[0] === nodesForEdge2[1]) {
+			targetNode = nodesForEdge1[1];
+		}
+		else {
+			targetNode = nodesForEdge1[0];
+		}
+		
+		nodesForEdge2 = GRAPH.getNodesForEdge(id);
+		
+		if(targetNode === nodesForEdge2[0] ||
+		targetNode === nodesForEdge2[1]) {
+			return true;
+		}
+		
+		return false;
+	}
+	
 	return {
 		solutions: solutions,
 		currSol: currSol,
@@ -1352,7 +1455,8 @@ var eulerianCycle = function() {
 		prevSolution: prevSolution,
 		replaySolution: replaySolution,
 		checkNewSolution: checkNewSolution,
-		clearSolutions: clearSolutions
+		clearSolutions: clearSolutions,
+		preselect: preselect
 	}
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1438,7 +1542,7 @@ var hamiltonianCycle = function() {
 	}
 	
 	var checkNewSolution = function(circuit) {
-		clearPreselect()
+		clearPreselect();
 		
 		for(var i = 0; i < solutions.length; i++) {
 			if(rotateSolutionCheck(circuit, solutions[i])) {
@@ -2655,6 +2759,11 @@ var Graph = function() {
 			return edge;
 		}
 		
+		var getNodesForEdge = function(eId) {
+			var e = findEdgeObject(eId);
+			return [e.getNode1(), e.getNode2()];	
+		}
+		
 		//Finds all edges for a node. Required object id.
 		var findEdges = function(n, both=false) {
 			var edgesFound = [];
@@ -2708,6 +2817,7 @@ var Graph = function() {
 			removeName: removeName,
 			findNode: findNode,
 			findEdge: findEdge,
+			getNodesForEdge: getNodesForEdge,
 			findEdges: findEdges,
 			findEdgeObject: findEdgeObject,
 			toStringJ: toStringJ
@@ -3605,7 +3715,8 @@ $(document).ready(function(){
 			renameNode(event.pageX, (event.pageY - $(this).offset().top));
 		}
 		else if(mode == "hamiltonianPathMode"
-		|| mode === "hamiltonianCycleMode") {
+		|| mode === "hamiltonianCycleMode"
+		|| mode === "eulerianCycleMode") {
 			selectionList();
 		}
 	});
@@ -3899,8 +4010,13 @@ function selectionList() {
 		if(mode === "hamiltonianPathMode") {
 			HAMILTONIANPATH.preselect(INTERSECTED.id);
 		}
-		if(mode === "hamiltonianCycleMode") {
+		else if(mode === "hamiltonianCycleMode") {
 			HAMILTONIANCYCLE.preselect(INTERSECTED.id);
+		}
+	}
+	else if(INTERSECTED !== null && INTERSECTED.userData == "Edge") {
+		if(mode === "eulerianCycleMode") {
+			EULERIANCYCLE.preselect(INTERSECTED.id);
 		}
 	}
 }
@@ -4058,7 +4174,7 @@ function eulerianCycleMode() {
 	ANIMATIONCONTROL.hideColorPicker();
 	ANIMATIONCONTROL.hidePreSelectButton();
 	mode = "eulerianCycleMode";
-	EULERIANCYCLE.main();
+	//EULERIANCYCLE.main();
 }
 function hamiltonianCycleMode() {
 	HINTBOX.setModeMessage("If you would like to narrow the search area, you can partially preselect your own path.<br>" +
