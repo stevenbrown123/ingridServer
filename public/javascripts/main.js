@@ -383,6 +383,9 @@ var animationControl = function() {
 		else if(mode === "hamiltonianCycleMode") {
 			HAMILTONIANCYCLE.main();
 		}
+		else if(mode === "eulerianCycleMode") {
+			EULERIANCYCLE.main();
+		}
 	}	
 	var prevColor = function() {
 		colorNumber = colorNumber - 1;
@@ -505,7 +508,8 @@ var animationControl = function() {
 			hideColorPicker();
 		}
 		if(mode !== "hamiltonianPathMode"
-		&& mode !== "hamiltonianCycleMode") {
+		&& mode !== "hamiltonianCycleMode"
+		&& mode !== "eulerianCycleMode") {
 			hidePreSelectButton();
 		}
 	}	
@@ -931,6 +935,7 @@ var eulerianCycle = function() {
 	
 	var preSelectList = [];
 	var preSelectLabels =[];
+	var preSelectNodeList = [];
 	const PRESELECT_LABEL_COLOR = 'red';
 	
 	var actualIterations; //correction of ITERATIONS
@@ -962,15 +967,12 @@ var eulerianCycle = function() {
 			//solutions.push(hierholzerAlgorithm());
 			
 			enlistWebWorkers();
-			
-			ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
-			animationSetUp();
 		}
 		else {
 			animationSetUp();
+			ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
 		}
 		
-		ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
 		return;
 	}
 	
@@ -1138,15 +1140,55 @@ var eulerianCycle = function() {
 		}
 	}
 	
-	var enlistWebWorkers = function(circuit, unusedEdges, edgesVisited, start, last) {
+	var enlistWebWorkers = function() {
+		var start;
+		var last;
+		var unusedEdges = [];
+		
+		var nodesForEdge = null;
+		
+		if(preSelectNodeList.length !== 0) {
+			start = preSelectNodeList[0];
+			last = preSelectNodeList[preSelectNodeList.length - 1];
+		}
+		else {
+			start = -1;
+			last = -1;
+		}
+		
+		for(var i = 0; i < preSelectList.length; i++) {
+			nodesForEdge = GRAPH.getNodesForEdge(preSelectList[i]);
+			
+			unusedEdges[nodesForEdge[0]] = unusedEdges[nodesForEdge[0]] === undefined || 
+				unusedEdges[nodesForEdge[0]] === null ? GRAPH.findNode(nodesForEdge[0]).getDegree() - 1 : 
+				unusedEdges[nodesForEdge[0]] - 1;
+			unusedEdges[nodesForEdge[1]] = unusedEdges[nodesForEdge[1]] === undefined || 
+				unusedEdges[nodesForEdge[1]] === null ? GRAPH.findNode(nodesForEdge[1]).getDegree() - 1 : 
+				unusedEdges[nodesForEdge[1]] - 1;
+		}
+		
+		var context = {
+			circuit: preSelectNodeList,
+			edgesVisited: preSelectList,
+			unusedEdges: unusedEdges,
+			start: start,
+			last: last,
+			matrix: matrix,
+			GRAPH: GRAPH.toStringJ()
+		}
+		
+		console.log(context);
+		
+		return;
+		
 		WEBWORKERMANAGER.enlistWebWorker(JSON.stringify({
 			type: "EC",
 			context: {
-				circuit: [],
-				edgesVisited: Array.from(edgesVisited),
+				circuit: preSelectNodeList,
+				edgesVisited: preSelectList,
 				unusedEdges: unusedEdges,
 				start: start,
-				last: start,
+				last: last,
 				matrix: matrix,
 				GRAPH: GRAPH.toStringJ()
 			}
@@ -1367,6 +1409,15 @@ var eulerianCycle = function() {
 				scene.remove(preSelectLabels[i]);
 				preSelectLabels.splice(i, 1);
 			}
+			
+			if(preSelectList.length === 0) {
+				preSelectNodeList = [];
+			}
+			else {
+				for(var i = preSelectList.length + 1; i < preSelectNodeList.length; ) {
+					preSelectNodeList.splice(i, 1);
+				}
+			}
 		}
 		else {
 			if(!validateSelection(id)) {
@@ -1398,6 +1449,7 @@ var eulerianCycle = function() {
 			preSelectLabels.splice(i, 1);
 			preSelectList.splice(i, 1);
 		}
+		preSelectNodeList = [];
 	}
 	
 	var validateSelection = function(id) {
@@ -1406,16 +1458,28 @@ var eulerianCycle = function() {
 		var targetNode = null;
 		
 		if(preSelectList.length === 0) {
+			nodesForEdge1 = GRAPH.getNodesForEdge(id);
+			preSelectNodeList = [nodesForEdge1[0], nodesForEdge1[1]];
 			return true;
 		}
 		if(preSelectList.length === 1) {
 			nodesForEdge1 = GRAPH.getNodesForEdge(preSelectList[0]);
 			nodesForEdge2 = GRAPH.getNodesForEdge(id);
 			
-			if(nodesForEdge1[0] === nodesForEdge2[0] ||
-			nodesForEdge1[0] === nodesForEdge2[1] ||
-			nodesForEdge1[1] === nodesForEdge2[0] ||
-			nodesForEdge1[1] === nodesForEdge2[1]) {
+			if(nodesForEdge1[0] === nodesForEdge2[0]) {
+				preSelectNodeList = [nodesForEdge1[1], nodesForEdge1[0], nodesForEdge2[1]];
+				return true;
+			}
+			if(nodesForEdge1[0] === nodesForEdge2[1]) {
+				preSelectNodeList = [nodesForEdge1[1], nodesForEdge1[0], nodesForEdge2[0]];
+				return true;
+			}
+			if(nodesForEdge1[1] === nodesForEdge2[0]) {
+				preSelectNodeList = [nodesForEdge1[0], nodesForEdge1[1], nodesForEdge2[1]];
+				return true;
+			}
+			if(nodesForEdge1[1] === nodesForEdge2[1]) {
+				preSelectNodeList = [nodesForEdge1[0], nodesForEdge1[1], nodesForEdge2[0]];
 				return true;
 			}
 			
@@ -1435,8 +1499,12 @@ var eulerianCycle = function() {
 		
 		nodesForEdge2 = GRAPH.getNodesForEdge(id);
 		
-		if(targetNode === nodesForEdge2[0] ||
-		targetNode === nodesForEdge2[1]) {
+		if(targetNode === nodesForEdge2[0]) {
+			preSelectNodeList.push(nodesForEdge2[1]);
+			return true;
+		}
+		if(targetNode === nodesForEdge2[1]) {
+			preSelectNodeList.push(nodesForEdge2[0]);
 			return true;
 		}
 		
@@ -4172,7 +4240,7 @@ function eulerianCycleMode() {
 	ANIMATIONCONTROL.showButtons();
 	ANIMATIONCONTROL.swapButtons();
 	ANIMATIONCONTROL.hideColorPicker();
-	ANIMATIONCONTROL.hidePreSelectButton();
+	ANIMATIONCONTROL.showPreSelectButton();
 	mode = "eulerianCycleMode";
 	//EULERIANCYCLE.main();
 }
