@@ -679,17 +679,20 @@
 				}
 				//Graph Coloring
 				else if(obj.type === "GC") {
-					//Backup context
+					
+					//Grab the context
 					backUpContext = obj.context;
 					backUpContext = unwrap(backUpContext);
 					
-					//This path's context
-					currentContext = copyECContext(backUpContext);
+					//Set this path's context
+					currentContext = copyGCContext(backUpContext);
 					
-					var candidateNode = {};
+					var giveUp = false; //Determines when to change color
+					var degree; //Used to select best candidate node(s)
 					
-					//Setup
+					//This is a fresh new coloring request, need to set it up
 					if(backUpContext.nodeColors.length === 0 && backUpContext.nodesLeft.length === 0) {
+						//Set up th nodes to be colored
 						for(var i = 0; i < backUpContext.GRAPH.nodes.length; i++) {
 							currentContext.nodesLeft.push({
 								id: currentContext.GRAPH.nodes[i].id,
@@ -697,88 +700,73 @@
 							})
 						}
 						
-						currentContext.changeColor = true;
-						currentContext.nodesLeft.sort(compareDegrees);
+						currentContext.changeColor = true;//Need to select the first color
+						currentContext.nodesLeft.sort(compareDegrees);//Non-increasing order
 						
 						//Update backup context
 						backUpContext = copyGCContext(currentContext);
 					}
 					
+					//Loops until all nodes have been colored
 					while(backUpContext.nodesLeft.length !== 0) {
+					
 						//Selecting a new color for incomplete coloring
 						if(backUpContext.changeColor === true){
 							
-							candidateNode = nodesLeft[0].id;
+							degree = backUpContext.nodesLeft[0].degree;
+							
+							backUpContext.currentColor++;
+							backUpContext.changeColor = false;
+							
+							currentContext = copyGCContext(backUpContext);
 							
 							//Selects nodes with same degree for other paths
-							for(var i = 1; i < backUpContext.nodesLeft.length && 
-							backUpContext.nodesLeft[i].degree === backUpContext.nodesLeft[0].degree; i++) {
-								newContext = copyGCContext(backUpContext);
-								newContext.currentColor++;
-								newContext.changeColor = false;
-								newContext.nodeColors.push({id: newContext.nodesLeft[i].id, color: colors[newContext.currentColor]});
-								newContext.nodesLeft.splice(i, 1);
-								self.postMessage(GCReport(wrap(newContext), "Incomplete"));
-							}
-							
-							//Update current context
-							currentContext.currentColor++;
-							currentContext.nodesLeft.shift();
-							currentContext.nodeColors.push({id: candidateNode, color: colors[currentContext.currentColor]});
-							currentContext.changeColor = false;
-							
-							//Update backup context
-							backUpContext = copyGCContext(currentContext);
-							
-							//Explore the possibilities
-							for(var i = 0; i < backUpContext.nodesLeft.length; i++) {
-								if(backUpContext.matrix[candidateNode][backUpContext.nodesLeft[i].id] === null) {
-									if(firstOpportunity === false) {
-										currentContext.nodeColors.push({id: nodesLeft[i].id, color: colors[currentContext.currentColor]});
-										currentContext.nodesLeft.splice(i, 1);
-										firstOpportunity = true;
-									}
-									else {
-										newContext = copyGCContext(backUpContext);
-										newContext.currentColor = backUpContext.currentColor;
-										newContext.nodeColors.push({id: newContext.nodesLeft[i].id, color: colors[newContext.currentColor]});
-										newContext.nodesLeft.splice(i, 1);
-										newContext.changeColor = false;
-										self.postMessage(GCReport(newContext, "Incomplete"));
-									}
+							for(var i = 0; i < backUpContext.nodesLeft.length && 
+							backUpContext.nodesLeft[i].degree === degree; i++) {
+								
+								if(firstOpportunity === false) {
+									currentContext.nodeColors.push({id: backUpContext.nodesLeft[i].id, color: backUpContext.colors[backUpContext.currentColor]});
+									currentContext.nodesLeft.splice(i, 1);
+									
+									firstOpportunity = true;
 								}
-							}
-							
-							if(firstOpportunity === true) {
-								currentContext.nodesLeft.splice(i, 1);
+								else {
+									//console.log(backUpContext);
+									newContext = copyGCContext(backUpContext);
+									newContext.nodeColors.push({id: backUpContext.nodesLeft[i].id, color: backUpContext.colors[backUpContext.currentColor]});
+									newContext.nodesLeft.splice(i, 1);
+									self.postMessage(GCReport(wrap(newContext), "Incomplete"));
+									//console.log(newContext);
+								}
 							}
 							
 							//Update backup context
 							backUpContext = copyGCContext(currentContext);
 							firstOpportunity = false;
 						}
+						
 						//Continuing the same color
 						else {
-							potential = false;
+							giveUp = true;
 							//Explore the opportunities
 							for(var i = 0; i < backUpContext.nodesLeft.length; i++) {
 								
 								if(checkAdjNodesColor(backUpContext.nodesLeft[i], backUpContext.nodeColors, 
-								backUpContext.matrix, colors[backUpContext.currentColor])) {
-									potential = true;
+								backUpContext.matrix, backUpContext.colors[backUpContext.currentColor])) {
+									giveUp = false;
 									if(firstOpportunity === false) {
-										currentContext.nodeColors.push({id: nodesLeft[i].id, color: colors[currentContext.currentColor]});
+										currentContext.nodeColors.push({id: backUpContext.nodesLeft[i].id, color: backUpContext.colors[backUpContext.currentColor]});
 										currentContext.nodesLeft.splice(i, 1);
 										
 										firstOpportunity = true;
 									}
 									else {
+										//console.log(backUpContext);
 										newContext = copyGCContext(backUpContext);
-										newContext.currentColor = currentContext.currentColor;
-										newContext.nodeColors.push({id: newContext.nodesLeft[i].id, color: colors[newContext.currentColor]});
+										newContext.nodeColors.push({id: backUpContext.nodesLeft[i].id, color: backUpContext.colors[backUpContext.currentColor]});
 										newContext.nodesLeft.splice(i, 1);
-										newContext.changeColor = false;
 										self.postMessage(GCReport(wrap(newContext), "Incomplete"));
+										//console.log(newContext);
 									}
 								}								
 							}
@@ -789,12 +777,15 @@
 							
 							//Give up on this color
 							if (giveUp === true) {
-								changeColor = true;
+								backUpContext.changeColor = true;
 							}
 						}
 					}
 					
-					self.postMessage(GCReport(obj, "Complete"));
+					if(backUpContext.nodeColors.length !== 0 && backUpContext.nodesLeft.length === 0) {
+						console.log(backUpContext.nodeColors.length + " " + backUpContext.nodesLeft.length)
+						self.postMessage(GCReport(wrap(backUpContext), "Complete"));
+					}
 				}
 			}
 			
@@ -829,6 +820,7 @@
 			}
 			
 			function copyGCContext(obj) {
+			
 				return {
 					nodeColors: obj.nodeColors.slice(),
 					nodesLeft: obj.nodesLeft.slice(),
