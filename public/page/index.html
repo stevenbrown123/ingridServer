@@ -532,8 +532,6 @@
 					
 					currentContext = copyEPContext(backUpContext);
 					
-					console.log("a");
-					
 					if(backUpContext.path.length === 0) {
 						for(var i = 0; i < backUpContext.GRAPH.edges.length; i++) {
 							if(firstOpportunity == false) {
@@ -556,25 +554,22 @@
 						potential = false;
 					
 						for(var i = 0; i < backUpContext.GRAPH.edges.length; i++) {
-							console.log(backUpContext.path[backUpContext.path.length - 1]);
 							if(backUpContext.matrix[backUpContext.path[backUpContext.path.length - 1]][backUpContext.GRAPH.edges[i].id]
 							&& !backUpContext.path.includes(backUpContext.GRAPH.edges[i].id)) {
 								potential = true;
 								console.log("c");
 							
 								if(firstOpportunity === false) {
-									currentContext.path.push(backUpContext.GRAPH.edges.id);
+									currentContext.path.push(backUpContext.GRAPH.edges[i].id);
 									firstOpportunity = true;
 								}
 								else {
 									newContext = copyEPContext(backUpContext);
-									newContext.path.push(backUpContext.GRAPH.edges.id);
+									newContext.path.push(backUpContext.GRAPH.edges[i].id);
 									self.postMessage(EPReport(wrap(newContext), "Incomplete"));
 								}
 							}
 						}
-						
-						console.log(potential);
 						
 						if(potential === false) {
 							return;
