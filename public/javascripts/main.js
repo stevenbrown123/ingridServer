@@ -207,7 +207,7 @@ var webWorkerManager = function() {
 				EULERIANCYCLE.checkNewSolution(data.context.circuit);
 			}
 			else if(data.type === "EP") {
-				EULERIANPATH.checkNewSolution(data.context.circuit);
+				EULERIANPATH.addNewSolution(data.context.path);
 			}
 			else if(data.type === "HC") {
 				HAMILTONIANCYCLE.checkNewSolution(data.context.circuit);
@@ -1600,6 +1600,7 @@ var eulerianPath = function() {
 	
 	var timeout = [];	
 	var solutions = [];
+	var solutionsE = [];
 	var currSol = 0;
 	var animationObjects = [];
 	var orderTexts = [];
@@ -1636,6 +1637,8 @@ var eulerianPath = function() {
 			if(!allNonZeroDegreeConnected()) {
 				return false;
 			}
+			
+			console.log(matrixE);
 			
 			enlistWebWorkers();
 		}
@@ -1746,51 +1749,60 @@ var eulerianPath = function() {
 		var obj;
 		var orderPlane;
 		
-		console.log(solution)
-		
 		for(var i = 0; i < solution.length; i++) {
 			orderPlane = UTILS.createLabel(i.toString(), ORDER_TEXT_COLOR);
 			obj = scene.getObjectById(solution[i]);
 			
-			orderPlane.position.set(obj.position.x, obj.position.y + ORDER_TEXT_DISTANCE_Y, LABEL_LAYER);
+			orderPlane.position.set(obj.position.x, obj.position.y, LABEL_LAYER);
 			scene.add(orderPlane);
 			orderTexts.push(orderPlane);
 		}
 	}
 	
-	var checkNewSolution = function(newSolution) {
+	var addNewSolution = function(newSolution) {
 		clearPreselect();
 		
-		for(var i = 0; i < solutions.length; i++) {
-			if(rotateSolutionCheck(newSolution, solutions[i])) {
-				return;
-			}
-		}		
-		
-		solutions.push(newSolution);
+		solutions.push(edgesToNodes(newSolution));
+		solutionsE[solutions.length - 1] = newSolution;
 		ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
+		
+		console.log(newSolution);
+		
+		if(solutions.length == 1) {
+			animationSetUp();
+		}
 	}
 	
-	var rotateSolutionCheck = function(newSolution, solution) {
-		for(var i = 0; i < newSolution.length - 1; i++) {
-			newSolution.shift();
-			newSolution.push(newSolution[0]);
+	var edgesToNodes = function(edgeList) {
+		var nodeList = [];
+		var nodesForEdge1 = GRAPH.getNodesForEdge(edgeList[0]);
+		var nodesForEdge2 = GRAPH.getNodesForEdge(edgeList[1]);
+		
+		if(nodesForEdge1[0] === nodesForEdge2[0]) {
+			nodeList = [nodesForEdge1[1], nodesForEdge1[0], nodesForEdge2[1]];
+		}
+		else if(nodesForEdge1[0] === nodesForEdge2[1]) {
+			nodeList = [nodesForEdge1[1], nodesForEdge1[0], nodesForEdge2[0]];
+		}
+		else if(nodesForEdge1[1] === nodesForEdge2[0]) {
+			nodeList = [nodesForEdge1[0], nodesForEdge1[1], nodesForEdge2[1]];
+		}
+		else {
+			nodeList = [nodesForEdge1[0], nodesForEdge1[1], nodesForEdge2[0]];
+		}
+		
+		for(var i = 2; i < edgeList.length; i++) {
+			nodesForEdge1 = GRAPH.getNodesForEdge(edgeList[i]);
 			
-			if(matchSolutions(newSolution, solution)) {
-				return true;
+			if(nodeList[nodeList.length - 1] !== nodesForEdge1[0]) {
+				nodeList.push(nodesForEdge1[0]);
+			}
+			else {
+				nodeList.push(nodesForEdge1[1]);
 			}
 		}
 		
-		return false;
-	}
-	
-	var matchSolutions = function(newSolution, solution) {
-		for(var i = 0; i < newSolution.length; i++) {
-			if(newSolution[i] !== solution[i]) {
-				return false;
-			}
-		}
-		return true;
+		return nodeList;
 	}
 	
 	//Animation where the arrows are drawn out incrementally starting with the first edge to the last in the circuit
@@ -1806,7 +1818,7 @@ var eulerianPath = function() {
 			circuit.push(solutions[currSol][i]);
 		}
 		
-		createOrderTextBoxes(solutions[currSol]);
+		createOrderTextBoxes(solutionsE[currSol]);
 		
 		var iterationsPerEdge = ITERATIONS/(circuit.length - 1);
 		var endPoints = [];
@@ -2056,7 +2068,7 @@ var eulerianPath = function() {
 		nextSolution: nextSolution,
 		prevSolution: prevSolution,
 		replaySolution: replaySolution,
-		checkNewSolution: checkNewSolution,
+		addNewSolution: addNewSolution,
 		clearSolutions: clearSolutions,
 		preselect: preselect
 	}

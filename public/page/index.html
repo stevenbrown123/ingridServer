@@ -548,16 +548,15 @@
 						backUpContext = copyEPContext(currentContext);
 					}
 					
-					console.log("b");
-					
-					while(backUpContext.path.length !== backUpContext.GRAPH.edges.length) {
+					while(backUpContext.path.length < backUpContext.GRAPH.edges.length) {
 						potential = false;
+						firstOpportunity = false;
 					
 						for(var i = 0; i < backUpContext.GRAPH.edges.length; i++) {
+						
 							if(backUpContext.matrix[backUpContext.path[backUpContext.path.length - 1]][backUpContext.GRAPH.edges[i].id]
 							&& !backUpContext.path.includes(backUpContext.GRAPH.edges[i].id)) {
 								potential = true;
-								console.log("c");
 							
 								if(firstOpportunity === false) {
 									currentContext.path.push(backUpContext.GRAPH.edges[i].id);
@@ -575,14 +574,10 @@
 							return;
 						}
 						backUpContext = copyEPContext(currentContext);
-						console.log("d");
 					}
 					
-					console.log(backUpContext.path);
-					
 					if(backUpContext.path.length === backUpContext.GRAPH.edges.length) {
-						self.postMessage(EPReport(wrap(newContext), "Complete"));
-						console.log(backUpContext.path);
+						self.postMessage(EPReport(wrap(backUpContext), "Complete"));
 					}
 				}
 				//Hamiltonian Cycle
