@@ -93,6 +93,38 @@ var utils = function() {
 		return matrix;
 	}
 	
+	var setUpEdgeMatrix = function() {
+		var matrix = [];
+		var nodesForEdge1 = null;
+		var nodesForEdge2 = null;
+		
+		for(var i = 0; i < GRAPH.edges.length; i++) {
+			matrix[GRAPH.edges[i].getId()] = [];
+			nodesForEdge1 = GRAPH.getNodesForEdge(GRAPH.edges[i].getId());
+			
+			for(var j = 0; j < GRAPH.edges.length; j++) {
+				if(i === j) {
+					matrix[GRAPH.edges[i].getId()][GRAPH.edges[i].getId()] = false;
+				}
+				else {
+					nodesForEdge2 = GRAPH.getNodesForEdge(GRAPH.edges[j].getId());
+					
+					if(nodesForEdge1[0] === nodesForEdge2[0]
+					|| nodesForEdge1[0] === nodesForEdge2[1]
+					|| nodesForEdge1[1] === nodesForEdge2[0]
+					|| nodesForEdge1[1] === nodesForEdge2[1]) {
+						matrix[GRAPH.edges[i].getId()][GRAPH.edges[j].getId()] = true;
+					}
+					else {
+						matrix[GRAPH.edges[i].getId()][GRAPH.edges[j].getId()] = false;
+					}
+				}
+			}
+		}
+		
+		return matrix;
+	}
+	
 	var createLabel = function(text, color='black') {
 		var canvas = document.createElement('canvas');
 		var g = canvas.getContext('2d');
@@ -131,6 +163,7 @@ var utils = function() {
 	return {
 		setUpMatrix: setUpMatrix,
 		setUpMatrixId: setUpMatrixId,
+		setUpEdgeMatrix: setUpEdgeMatrix,
 		createLabel: createLabel
 	};
 }
@@ -1579,6 +1612,7 @@ var eulerianPath = function() {
 	
 	var actualIterations; //correction of ITERATIONS
 	var matrix;
+	var matrixE;
 	
 	var timeouts = [];//Animation that is still animating
 	
@@ -1597,6 +1631,7 @@ var eulerianPath = function() {
 			}
 			
 			matrix = UTILS.setUpMatrixId();
+			matrixE = UTILS.setUpEdgeMatrix();
 			
 			if(!allNonZeroDegreeConnected()) {
 				return false;
@@ -1697,14 +1732,11 @@ var eulerianPath = function() {
 	
 	var enlistWebWorkers = function() {
 	
-		console.log(preSelectList);
-		return;
-	
 		WEBWORKERMANAGER.enlistWebWorker(JSON.stringify({
-			type: "EC",
+			type: "EP",
 			context: {
 				path: preSelectList,
-				matrix: matrix,
+				matrix: matrixE,
 				GRAPH: GRAPH.toStringJ()
 			}
 		}));

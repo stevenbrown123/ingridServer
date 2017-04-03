@@ -525,6 +525,71 @@
 						backUpContext = copyECContext(currentContext);
 					}
 				}
+				//Eulerian Path
+				else if(obj.type === "EP") {
+					backUpContext = obj.context;
+					backUpContext = unwrap(backUpContext);
+					
+					currentContext = copyEPContext(backUpContext);
+					
+					console.log("a");
+					
+					if(backUpContext.path.length === 0) {
+						for(var i = 0; i < backUpContext.GRAPH.edges.length; i++) {
+							if(firstOpportunity == false) {
+								currentContext.path.push(backUpContext.GRAPH.edges[i].id);
+								firstOpportunity = true;
+							}
+							else {
+								newContext = copyEPContext(backUpContext);
+								newContext.path.push(backUpContext.GRAPH.edges[i].id);
+								self.postMessage(EPReport(wrap(newContext), "Incomplete"));
+							}
+						}
+						
+						backUpContext = copyEPContext(currentContext);
+					}
+					
+					console.log("b");
+					
+					while(backUpContext.path.length !== backUpContext.GRAPH.edges.length) {
+						potential = false;
+					
+						for(var i = 0; i < backUpContext.GRAPH.edges.length; i++) {
+							console.log(backUpContext.path[backUpContext.path.length - 1]);
+							if(backUpContext.matrix[backUpContext.path[backUpContext.path.length - 1]][backUpContext.GRAPH.edges[i].id]
+							&& !backUpContext.path.includes(backUpContext.GRAPH.edges[i].id)) {
+								potential = true;
+								console.log("c");
+							
+								if(firstOpportunity === false) {
+									currentContext.path.push(backUpContext.GRAPH.edges.id);
+									firstOpportunity = true;
+								}
+								else {
+									newContext = copyEPContext(backUpContext);
+									newContext.path.push(backUpContext.GRAPH.edges.id);
+									self.postMessage(EPReport(wrap(newContext), "Incomplete"));
+								}
+							}
+						}
+						
+						console.log(potential);
+						
+						if(potential === false) {
+							return;
+						}
+						backUpContext = copyEPContext(currentContext);
+						console.log("d");
+					}
+					
+					console.log(backUpContext.path);
+					
+					if(backUpContext.path.length === backUpContext.GRAPH.edges.length) {
+						self.postMessage(EPReport(wrap(newContext), "Complete"));
+						console.log(backUpContext.path);
+					}
+				}
 				//Hamiltonian Cycle
 				else if(obj.type === "HC") {
 					//Backup context
@@ -812,6 +877,14 @@
 				};
 			}
 			
+			function copyEPContext(obj) {
+				return {
+					path: obj.path.slice(),
+					matrix: obj.matrix,
+					GRAPH: obj.GRAPH
+				};
+			}
+			
 			function copyHCContext(obj) {
 				return {
 					circuit: obj.circuit.slice(),
@@ -846,6 +919,14 @@
 			function ECReport(context, status) {
 				return JSON.stringify({
 					type: "EC",
+					context: context,
+					status: status
+				});
+			}
+			
+			function EPReport(context, status) {
+				return JSON.stringify({
+					type: "EP",
 					context: context,
 					status: status
 				});

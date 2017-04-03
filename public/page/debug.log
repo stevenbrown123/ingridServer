@@ -4,3 +4,20 @@
 [0402/125248.831:ERROR:exception_snapshot_win.cc(87)] thread ID 3984 not found in process
 [0402/125248.831:WARNING:crash_report_exception_handler.cc(60)] ProcessSnapshotWin::Initialize failed
 [0402/125248.831:ERROR:scoped_process_suspend.cc(38)] NtResumeProcess: An attempt was made to access an exiting process.  (0xc000010a)
+[0402/155621.619:ERROR:process_info.cc(608)] range at 0xfa8fe000, size 0x2000 fully unreadable
+[0402/155621.619:ERROR:process_info.cc(608)] range at 0xfaffe000, size 0x2000 fully unreadable
+[0402/155621.619:ERROR:process_info.cc(608)] range at 0xfb0fe000, size 0x2000 fully unreadable
+[0402/155621.619:ERROR:process_info.cc(608)] range at 0xfb9fe000, size 0x2000 fully unreadable
+[0402/155621.620:ERROR:process_info.cc(608)] range at 0xfc2fe000, size 0x2000 fully unreadable
+[0402/155621.620:ERROR:process_info.cc(608)] range at 0xfcf0e000, size 0x2000 fully unreadable
+[0402/155621.620:ERROR:process_info.cc(608)] range at 0xfd2fe000, size 0x2000 fully unreadable
+[0402/155621.621:ERROR:process_info.cc(608)] range at 0xfd4ff000, size 0x1000 fully unreadable
+[0402/155621.621:ERROR:process_info.cc(608)] range at 0xfdb7e000, size 0x2000 fully unreadable
+[0402/155621.621:ERROR:process_info.cc(608)] range at 0xfec7a000, size 0x6000 fully unreadable
+[0402/155621.621:ERROR:process_info.cc(608)] range at 0xfed7a000, size 0x6000 fully unreadable
+[0402/155621.621:ERROR:process_info.cc(608)] range at 0xfefdb000, size 0x5000 fully unreadable
+[0402/155621.622:ERROR:process_info.cc(608)] range at 0xff0db000, size 0x5000 fully unreadable
+[0402/155621.622:ERROR:process_info.cc(608)] range at 0xff1db000, size 0x5000 fully unreadable
+[0402/155621.622:ERROR:process_info.cc(608)] range at 0xff2db000, size 0x5000 fully unreadable
+[0402/155621.622:ERROR:process_info.cc(608)] range at 0xff3db000, size 0x5000 fully unreadable
+[0402/155621.623:ERROR:process_info.cc(608)] range at 0xff4dc000, size 0x4000 fully unreadable
