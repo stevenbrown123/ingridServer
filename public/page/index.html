@@ -385,7 +385,6 @@
 							}
 							
 							if(potential === false) {
-								console.log(backUpContext);
 								return;
 							}
 							
@@ -503,7 +502,6 @@
 							currentContext.circuit.push(currentContext.last);
 							self.postMessage(ECReport(wrap(currentContext),"Complete"));
 							
-							console.log(currentContext.circuit);
 							return;
 						}
 						

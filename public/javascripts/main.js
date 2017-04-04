@@ -985,6 +985,7 @@ var eulerianCycle = function() {
 	
 	var timeout = [];	
 	var solutions = [];
+	var solutionsE = [];
 	var currSol = 0;
 	var animationObjects = [];
 	var orderTexts = [];
@@ -1251,7 +1252,7 @@ var eulerianCycle = function() {
 			orderPlane = UTILS.createLabel(i.toString(), ORDER_TEXT_COLOR);
 			obj = scene.getObjectById(solution[i]);
 			
-			orderPlane.position.set(obj.position.x, obj.position.y + ORDER_TEXT_DISTANCE_Y, LABEL_LAYER);
+			orderPlane.position.set(obj.position.x, obj.position.y, LABEL_LAYER);
 			scene.add(orderPlane);
 			orderTexts.push(orderPlane);
 		}
@@ -1267,7 +1268,12 @@ var eulerianCycle = function() {
 		}		
 		
 		solutions.push(newSolution);
+		solutionsE[solutions.length - 1] = nodesToEdges(newSolution);
 		ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
+		
+		if(solutions.length == 1) {
+			animationSetUp();
+		}
 	}
 	
 	var rotateSolutionCheck = function(newSolution, solution) {
@@ -1292,6 +1298,16 @@ var eulerianCycle = function() {
 		return true;
 	}
 	
+	var nodesToEdges = function(nodeList) {
+		var edgeList = [];
+		
+		for(var i = 0; i < nodeList.length - 1; i++) {
+			edgeList.push(GRAPH.findEdge(nodeList[i], nodeList[i + 1]));
+		}
+		
+		return edgeList;
+	} 
+	
 	//Animation where the arrows are drawn out incrementally starting with the first edge to the last in the circuit
 	var animationSetUp = function() {
 		if(solutions.length === 0) {
@@ -1305,7 +1321,9 @@ var eulerianCycle = function() {
 			circuit.push(solutions[currSol][i]);
 		}
 		
-		createOrderTextBoxes(solutions[currSol]);
+		console.log(solutionsE);
+		
+		createOrderTextBoxes(solutionsE[currSol]);
 		
 		var iterationsPerEdge = ITERATIONS/(circuit.length - 1);
 		var endPoints = [];
@@ -1641,8 +1659,6 @@ var eulerianPath = function() {
 				return false;
 			}
 			
-			console.log(matrixE);
-			
 			enlistWebWorkers();
 		}
 		else {
@@ -1768,8 +1784,6 @@ var eulerianPath = function() {
 		solutions.push(edgesToNodes(newSolution));
 		solutionsE[solutions.length - 1] = newSolution;
 		ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
-		
-		console.log(newSolution);
 		
 		if(solutions.length == 1) {
 			animationSetUp();
