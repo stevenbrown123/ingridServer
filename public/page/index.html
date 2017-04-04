@@ -413,7 +413,7 @@
 									}
 									else {
 										newContext = copyECContext(backUpContext);
-										newContext.edgesVisited.push(matrix[newContext.last][backUpContext.GRAPH.nodes[i].id]);
+										newContext.edgesVisited.push(backUpContext.matrix[newContext.last][backUpContext.GRAPH.nodes[i].id]);
 										newContext.unusedEdges[newContext.last]--;
 										newContext.unusedEdges[newContext.start]--;
 										newContext.last = newContext.start;
