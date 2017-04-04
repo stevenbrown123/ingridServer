@@ -341,7 +341,7 @@
 					while(true) {
 						//Either new or a mini cycle was completed, so start off the next cycle
 						if(backUpContext.start === backUpContext.last) {
-							
+						
 							//Explore the leftover adjacent edges
 							for(var i = 0; i < backUpContext.GRAPH.nodes.length; i++) {
 							
@@ -456,7 +456,6 @@
 							}
 							
 							if(potential === false) {
-								console.log(backUpContext);
 								return;
 							}
 							
@@ -578,6 +577,7 @@
 					
 					if(backUpContext.path.length === backUpContext.GRAPH.edges.length) {
 						self.postMessage(EPReport(wrap(backUpContext), "Complete"));
+						console.log(backUpContext);
 					}
 				}
 				//Hamiltonian Cycle

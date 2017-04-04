@@ -1201,16 +1201,19 @@ var eulerianCycle = function() {
 		var start;
 		var last;
 		var unusedEdges = [];
+		var circuit = [];
 		
 		var nodesForEdge = null;
 		
 		if(preSelectNodeList.length !== 0) {
 			start = preSelectNodeList[0];
 			last = preSelectNodeList[preSelectNodeList.length - 1];
+			circuit = preSelectNodeList;
 		}
 		else {
 			start = GRAPH.nodes[0].getId();
 			last = GRAPH.nodes[0].getId();
+			circuit.push(GRAPH.nodes[0].getId());
 		}
 		
 		for(var i = 0; i < preSelectList.length; i++) {
@@ -1227,7 +1230,7 @@ var eulerianCycle = function() {
 		WEBWORKERMANAGER.enlistWebWorker(JSON.stringify({
 			type: "EC",
 			context: {
-				circuit: preSelectNodeList,
+				circuit: circuit,
 				edgesVisited: preSelectList,
 				unusedEdges: unusedEdges,
 				start: start,
