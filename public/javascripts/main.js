@@ -93,6 +93,38 @@ var utils = function() {
 		return matrix;
 	}
 	
+	var setUpEdgeMatrix = function() {
+		var matrix = [];
+		var nodesForEdge1 = null;
+		var nodesForEdge2 = null;
+		
+		for(var i = 0; i < GRAPH.edges.length; i++) {
+			matrix[GRAPH.edges[i].getId()] = [];
+			nodesForEdge1 = GRAPH.getNodesForEdge(GRAPH.edges[i].getId());
+			
+			for(var j = 0; j < GRAPH.edges.length; j++) {
+				if(i === j) {
+					matrix[GRAPH.edges[i].getId()][GRAPH.edges[i].getId()] = false;
+				}
+				else {
+					nodesForEdge2 = GRAPH.getNodesForEdge(GRAPH.edges[j].getId());
+					
+					if(nodesForEdge1[0] === nodesForEdge2[0]
+					|| nodesForEdge1[0] === nodesForEdge2[1]
+					|| nodesForEdge1[1] === nodesForEdge2[0]
+					|| nodesForEdge1[1] === nodesForEdge2[1]) {
+						matrix[GRAPH.edges[i].getId()][GRAPH.edges[j].getId()] = true;
+					}
+					else {
+						matrix[GRAPH.edges[i].getId()][GRAPH.edges[j].getId()] = false;
+					}
+				}
+			}
+		}
+		
+		return matrix;
+	}
+	
 	var createLabel = function(text, color='black') {
 		var canvas = document.createElement('canvas');
 		var g = canvas.getContext('2d');
@@ -131,6 +163,7 @@ var utils = function() {
 	return {
 		setUpMatrix: setUpMatrix,
 		setUpMatrixId: setUpMatrixId,
+		setUpEdgeMatrix: setUpEdgeMatrix,
 		createLabel: createLabel
 	};
 }
@@ -172,6 +205,9 @@ var webWorkerManager = function() {
 		else {
 			if(data.type === "EC") {
 				EULERIANCYCLE.checkNewSolution(data.context.circuit);
+			}
+			else if(data.type === "EP") {
+				EULERIANPATH.addNewSolution(data.context.path);
 			}
 			else if(data.type === "HC") {
 				HAMILTONIANCYCLE.checkNewSolution(data.context.circuit);
@@ -289,6 +325,9 @@ var animationControl = function() {
 		else if(mode === "eulerianCycleMode") {
 			EULERIANCYCLE.skipAnimation();
 		}
+		else if(mode === "eulerianPathMode") {
+			EULERIANPATH.skipAnimation();
+		}
 		else if(mode === "hamiltonianCycleMode") {
 			HAMILTONIANCYCLE.skipAnimation();
 		}
@@ -299,6 +338,9 @@ var animationControl = function() {
 	var nextAnimation = function() {
 		if(mode === "eulerianCycleMode") {
 			EULERIANCYCLE.nextSolution();
+		}
+		else if(mode === "eulerianPathMode") {
+			EULERIANPATH.nextSolution();
 		}
 		else if(mode === "hamiltonianCycleMode") {
 			HAMILTONIANCYCLE.nextSolution();
@@ -314,6 +356,9 @@ var animationControl = function() {
 		if(mode === "eulerianCycleMode") {
 			EULERIANCYCLE.prevSolution();
 		}
+		else if(mode === "eulerianPathMode") {
+			EULERIANPATH.prevSolution();
+		}
 		else if(mode === "hamiltonianCycleMode") {
 			HAMILTONIANCYCLE.prevSolution();
 		}
@@ -328,6 +373,9 @@ var animationControl = function() {
 		if(mode === "eulerianCycleMode") {
 			EULERIANCYCLE.replaySolution();
 		}
+		else if(mode === "eulerianPathMode") {
+			EULERIANPATH.replaySolution();
+		}
 		else if(mode === "hamiltonianCycleMode") {
 			HAMILTONIANCYCLE.replaySolution();
 		}
@@ -339,6 +387,9 @@ var animationControl = function() {
 	var cleanUpAnimation = function() {
 		if(mode === "eulerianCycleMode") {
 			EULERIANCYCLE.cleanUpAnimation();
+		}
+		else if(mode === "eulerianPathMode") {
+			EULERIANPATH.cleanUpAnimation();
 		}
 		else if(mode === "hamiltonianCycleMode") {
 			HAMILTONIANCYCLE.cleanUpAnimation();
@@ -382,6 +433,12 @@ var animationControl = function() {
 		}
 		else if(mode === "hamiltonianCycleMode") {
 			HAMILTONIANCYCLE.main();
+		}
+		else if(mode === "eulerianCycleMode") {
+			EULERIANCYCLE.main();
+		}
+		else if(mode === "eulerianPathMode") {
+			EULERIANPATH.main();
 		}
 	}	
 	var prevColor = function() {
@@ -496,6 +553,7 @@ var animationControl = function() {
 		$("#go").css( "left", $("#renderer").width() - $("#go").width() - MARGIN*2 );
 		
 		if(mode !== "eulerianCycleMode"
+		&& mode !== "eulerianPathMode"
 		&& mode !== "hamiltonianCycleMode"
 		&& mode !== "hamiltonianPathMode"
 		&& mode !== "graphColorMode") {
@@ -505,7 +563,9 @@ var animationControl = function() {
 			hideColorPicker();
 		}
 		if(mode !== "hamiltonianPathMode"
-		&& mode !== "hamiltonianCycleMode") {
+		&& mode !== "hamiltonianCycleMode"
+		&& mode !== "eulerianCycleMode"
+		&& mode !== "eulerianPathMode") {
 			hidePreSelectButton();
 		}
 	}	
@@ -524,6 +584,7 @@ var animationControl = function() {
 	
 	var clearAllSolutions = function() {
 		EULERIANCYCLE.clearSolutions();
+		EULERIANPATH.clearSolutions();
 		HAMILTONIANCYCLE.clearSolutions();
 		HAMILTONIANPATH.clearSolutions();
 		GRAPHCOLOR.clearSolutions();
@@ -586,10 +647,10 @@ var hintBox = function() {
 	}
 	
 	var outPutMessage =function() {
-		$("#hint").html((errorMessage.length !== 0 ? errorMessage + "<br/>" : "") + 
-			(formatMessage.length !== 0 ? formatMessage + "<br/>" : "") +
-			(workingOnMessage.length !== 0 ? workingOnMessage + "<br/>" : "") + 
-			(modeMessage.length !== 0 ? modeMessage + "<br/>" : "") + generalMessage);
+		$("#hint").html((errorMessage !== undefined && errorMessage.length !== 0 ? errorMessage + "<br/>" : "") + 
+			(formatMessage !== undefined && formatMessage.length !== 0 ? formatMessage + "<br/>" : "") +
+			(workingOnMessage !== undefined && workingOnMessage.length !== 0 ? workingOnMessage + "<br/>" : "") + 
+			(modeMessage !== undefined && modeMessage.length !== 0 ? modeMessage + "<br/>" : "") + generalMessage);
 	}
 	
 	return {
@@ -755,7 +816,7 @@ var edgeContraction = function() {
 	const ITERATIONS = ANIMATION_TIME/TIME_BT_FRAMES;
 	
 	var timeouts = [];
-	var doing = false;;
+	var doing = false;
 	
 	var node1;
 	var node2;
@@ -774,6 +835,7 @@ var edgeContraction = function() {
 
 	//Visually outputs teh result
 	var main = function(n1, n2) {
+		doing = true;
 		node1 = scene.getObjectById(n1);
 		node2 = scene.getObjectById(n2);
 		
@@ -831,7 +893,6 @@ var edgeContraction = function() {
 		node.position.set(vector.x, vector.y, NODE_LAYER);
 		
 		GRAPHDRAWER.repositionEdges(node);
-		doing = false;
 	}
 	//Updates the actual graph
 	var updateGraph = function(n1, n2, vector) {
@@ -842,6 +903,8 @@ var edgeContraction = function() {
 		if(doing === false) {
 			return;
 		}
+		
+		doing = false;
 		
 		//Grabs all edges of the old nodes
 		edgeList = GRAPH.findEdges(n1.id, true);
@@ -922,10 +985,16 @@ var eulerianCycle = function() {
 	
 	var timeout = [];	
 	var solutions = [];
+	var solutionsE = [];
 	var currSol = 0;
 	var animationObjects = [];
 	var orderTexts = [];
 	var animationParameters = [];
+	
+	var preSelectList = [];
+	var preSelectLabels =[];
+	var preSelectNodeList = [];
+	const PRESELECT_LABEL_COLOR = 'red';
 	
 	var actualIterations; //correction of ITERATIONS
 	var matrix;
@@ -953,16 +1022,15 @@ var eulerianCycle = function() {
 			}
 			
 			//The answer(s)
-			solutions.push(hierholzerAlgorithm());
+			//solutions.push(hierholzerAlgorithm());
 			
-			ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
-			animationSetUp();
+			enlistWebWorkers();
 		}
 		else {
 			animationSetUp();
+			ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
 		}
 		
-		ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
 		return;
 	}
 	
@@ -1130,15 +1198,44 @@ var eulerianCycle = function() {
 		}
 	}
 	
-	var enlistWebWorkers = function(circuit, unusedEdges, edgesVisited, start, last) {
+	var enlistWebWorkers = function() {
+		var start;
+		var last;
+		var unusedEdges = [];
+		var circuit = [];
+		
+		var nodesForEdge = null;
+		
+		if(preSelectNodeList.length !== 0) {
+			start = preSelectNodeList[0];
+			last = preSelectNodeList[preSelectNodeList.length - 1];
+			circuit = preSelectNodeList;
+		}
+		else {
+			start = GRAPH.nodes[0].getId();
+			last = GRAPH.nodes[0].getId();
+			circuit.push(GRAPH.nodes[0].getId());
+		}
+		
+		for(var i = 0; i < preSelectList.length; i++) {
+			nodesForEdge = GRAPH.getNodesForEdge(preSelectList[i]);
+			
+			unusedEdges[nodesForEdge[0]] = unusedEdges[nodesForEdge[0]] === undefined || 
+				unusedEdges[nodesForEdge[0]] === null ? GRAPH.findNode(nodesForEdge[0]).getDegree() - 1 : 
+				unusedEdges[nodesForEdge[0]] - 1;
+			unusedEdges[nodesForEdge[1]] = unusedEdges[nodesForEdge[1]] === undefined || 
+				unusedEdges[nodesForEdge[1]] === null ? GRAPH.findNode(nodesForEdge[1]).getDegree() - 1 : 
+				unusedEdges[nodesForEdge[1]] - 1;
+		}
+		
 		WEBWORKERMANAGER.enlistWebWorker(JSON.stringify({
 			type: "EC",
 			context: {
 				circuit: circuit,
-				edgesVisited: Array.from(edgesVisited),
+				edgesVisited: preSelectList,
 				unusedEdges: unusedEdges,
 				start: start,
-				last: start,
+				last: last,
 				matrix: matrix,
 				GRAPH: GRAPH.toStringJ()
 			}
@@ -1155,14 +1252,14 @@ var eulerianCycle = function() {
 			orderPlane = UTILS.createLabel(i.toString(), ORDER_TEXT_COLOR);
 			obj = scene.getObjectById(solution[i]);
 			
-			orderPlane.position.set(obj.position.x, obj.position.y + ORDER_TEXT_DISTANCE_Y, LABEL_LAYER);
+			orderPlane.position.set(obj.position.x, obj.position.y, LABEL_LAYER);
 			scene.add(orderPlane);
 			orderTexts.push(orderPlane);
 		}
 	}
 	
 	var checkNewSolution = function(newSolution) {
-		console.log(newSolution);
+		clearPreselect();
 		
 		for(var i = 0; i < solutions.length; i++) {
 			if(rotateSolutionCheck(newSolution, solutions[i])) {
@@ -1171,7 +1268,12 @@ var eulerianCycle = function() {
 		}		
 		
 		solutions.push(newSolution);
+		solutionsE[solutions.length - 1] = nodesToEdges(newSolution);
 		ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
+		
+		if(solutions.length == 1) {
+			animationSetUp();
+		}
 	}
 	
 	var rotateSolutionCheck = function(newSolution, solution) {
@@ -1196,6 +1298,16 @@ var eulerianCycle = function() {
 		return true;
 	}
 	
+	var nodesToEdges = function(nodeList) {
+		var edgeList = [];
+		
+		for(var i = 0; i < nodeList.length - 1; i++) {
+			edgeList.push(GRAPH.findEdge(nodeList[i], nodeList[i + 1]));
+		}
+		
+		return edgeList;
+	} 
+	
 	//Animation where the arrows are drawn out incrementally starting with the first edge to the last in the circuit
 	var animationSetUp = function() {
 		if(solutions.length === 0) {
@@ -1209,7 +1321,9 @@ var eulerianCycle = function() {
 			circuit.push(solutions[currSol][i]);
 		}
 		
-		createOrderTextBoxes(solutions[currSol]);
+		console.log(solutionsE);
+		
+		createOrderTextBoxes(solutionsE[currSol]);
 		
 		var iterationsPerEdge = ITERATIONS/(circuit.length - 1);
 		var endPoints = [];
@@ -1295,6 +1409,7 @@ var eulerianCycle = function() {
 	}
 	//Clear the animation
 	var cleanUpAnimation = function(){
+		clearPreselect();
 		for(var i = 0; i < animationObjects.length; i++) {
 			scene.remove(animationObjects[i]);
 		}
@@ -1338,6 +1453,128 @@ var eulerianCycle = function() {
 		animationSetUp();
 	}
 	
+	var preselect = function(id) {
+		var myLabel;
+		var obj;
+		var index;
+		var objToRemove;
+		
+		console.log(id);
+		
+		//Deconstruct the last part of the path
+		if(preSelectList.includes(id)) {
+			index = preSelectList.indexOf(id);
+			
+			for(var i = index; i <preSelectList.length;) {
+				preSelectList.splice(index, 1);
+			}
+			
+			for(var i = index; i < preSelectLabels.length; ) {
+				scene.remove(preSelectLabels[i]);
+				preSelectLabels.splice(i, 1);
+			}
+			
+			if(preSelectList.length === 0) {
+				preSelectNodeList = [];
+			}
+			else {
+				for(var i = preSelectList.length + 1; i < preSelectNodeList.length; ) {
+					preSelectNodeList.splice(i, 1);
+				}
+			}
+		}
+		else {
+			if(!validateSelection(id)) {
+				HINTBOX.setErrorMessage("The edge you selected is invalid.");
+				return;
+			}
+			
+			HINTBOX.setErrorMessage("");
+			
+			preSelectList.push(id);
+			
+			myLabel = UTILS.createLabel(preSelectList.length.toString(), PRESELECT_LABEL_COLOR);
+			obj = scene.getObjectById(id);
+			
+			myLabel.position.set(obj.position.x, obj.position.y, LABEL_LAYER);
+			
+			preSelectLabels.push(myLabel);
+			scene.add(myLabel);
+		}
+		
+		WEBWORKERMANAGER.restart();
+		ANIMATIONCONTROL.updateCounter();
+		clearSolutions();
+	}
+	
+	var clearPreselect = function() {
+		for(var i = 0; i < preSelectList.length; ) {
+			scene.remove(preSelectLabels[i]);
+			preSelectLabels.splice(i, 1);
+			preSelectList.splice(i, 1);
+		}
+		preSelectNodeList = [];
+	}
+	
+	var validateSelection = function(id) {
+		var nodesForEdge1 = null;
+		var nodesForEdge2 = null;
+		var targetNode = null;
+		
+		if(preSelectList.length === 0) {
+			nodesForEdge1 = GRAPH.getNodesForEdge(id);
+			preSelectNodeList = [nodesForEdge1[0], nodesForEdge1[1]];
+			return true;
+		}
+		if(preSelectList.length === 1) {
+			nodesForEdge1 = GRAPH.getNodesForEdge(preSelectList[0]);
+			nodesForEdge2 = GRAPH.getNodesForEdge(id);
+			
+			if(nodesForEdge1[0] === nodesForEdge2[0]) {
+				preSelectNodeList = [nodesForEdge1[1], nodesForEdge1[0], nodesForEdge2[1]];
+				return true;
+			}
+			if(nodesForEdge1[0] === nodesForEdge2[1]) {
+				preSelectNodeList = [nodesForEdge1[1], nodesForEdge1[0], nodesForEdge2[0]];
+				return true;
+			}
+			if(nodesForEdge1[1] === nodesForEdge2[0]) {
+				preSelectNodeList = [nodesForEdge1[0], nodesForEdge1[1], nodesForEdge2[1]];
+				return true;
+			}
+			if(nodesForEdge1[1] === nodesForEdge2[1]) {
+				preSelectNodeList = [nodesForEdge1[0], nodesForEdge1[1], nodesForEdge2[0]];
+				return true;
+			}
+			
+			return false;
+		}
+		
+		nodesForEdge1 = GRAPH.getNodesForEdge(preSelectList[preSelectList.length - 1]);
+		nodesForEdge2 = GRAPH.getNodesForEdge(preSelectList[preSelectList.length - 2]);
+		
+		if(nodesForEdge1[0] === nodesForEdge2[0] ||
+		nodesForEdge1[0] === nodesForEdge2[1]) {
+			targetNode = nodesForEdge1[1];
+		}
+		else {
+			targetNode = nodesForEdge1[0];
+		}
+		
+		nodesForEdge2 = GRAPH.getNodesForEdge(id);
+		
+		if(targetNode === nodesForEdge2[0]) {
+			preSelectNodeList.push(nodesForEdge2[1]);
+			return true;
+		}
+		if(targetNode === nodesForEdge2[1]) {
+			preSelectNodeList.push(nodesForEdge2[0]);
+			return true;
+		}
+		
+		return false;
+	}
+	
 	return {
 		solutions: solutions,
 		currSol: currSol,
@@ -1350,11 +1587,511 @@ var eulerianCycle = function() {
 		prevSolution: prevSolution,
 		replaySolution: replaySolution,
 		checkNewSolution: checkNewSolution,
-		clearSolutions: clearSolutions
+		clearSolutions: clearSolutions,
+		preselect: preselect
 	}
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////                  End Eulerian Cycle                                   //////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////                   ~Eulerian Path ~                                    //////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+/*	Eulerian Cycle
+
+	Handles the Eularian Cycle function and deals with its animation
+	Currently only visually outputs one cycle
+	
+	Public Methods:
+	main - visually outputs the answer
+	resetArrows - cleans up the drawing
+*/
+var eulerianPath = function() {
+	const ANIMATION_TIME = 2000;
+	const ITERATIONS = ANIMATION_TIME/TIME_BT_FRAMES;//splits frames 
+	const ARROW_COLOR = 0xff0000;
+	const ARROW_LAYER = 0; //Keep at this value, it won't appear otherwise
+	const HEAD_LENGTH = 20;
+	const HEAD_WIDTH = 10;
+	const ORDER_TEXT_COLOR = 'white';
+	const ORDER_TEXT_DISTANCE_Y = 45;
+	
+	var doing = false;
+	
+	var timeout = [];	
+	var solutions = [];
+	var solutionsE = [];
+	var currSol = 0;
+	var animationObjects = [];
+	var orderTexts = [];
+	var animationParameters = [];
+	
+	var preSelectList = [];
+	var preSelectLabels =[];
+	var preSelectNodeList = [];
+	const PRESELECT_LABEL_COLOR = 'red';
+	
+	var actualIterations; //correction of ITERATIONS
+	var matrix;
+	var matrixE;
+	
+	var timeouts = [];//Animation that is still animating
+	
+	//Visually outputs answer
+	var main = function() {
+		if(solutions.length === 0) {
+			
+			ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
+			
+			//Checks all qualifiying criteria
+			if(GRAPH.edges.length == 0) {
+				return [];
+			}	
+			if(!twoOrZeroOddDegrees()) {
+				return false;
+			}
+			
+			matrix = UTILS.setUpMatrixId();
+			matrixE = UTILS.setUpEdgeMatrix();
+			
+			if(!allNonZeroDegreeConnected()) {
+				return false;
+			}
+			
+			enlistWebWorkers();
+		}
+		else {
+			animationSetUp();
+			ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
+		}
+		
+		return;
+	}
+	
+	//Criteria for eularian path
+	var twoOrZeroOddDegrees = function() {
+		var count = 0;
+		
+		for(var i = 0; i < GRAPH.nodes.length; i++) {
+			if(GRAPH.nodes[i].getDegree() % 2 == 1) {
+				count++;
+			}
+		}
+		return count === 0 || count === 2;
+	}
+	//Criteria for eularian cycle
+	var allNonZeroDegreeConnected = function() {
+		var bool = true;//assume true
+		
+		var notVisited = new Set(GRAPH.nodes);
+		var next = [];
+		var start;
+		
+		var add = [];
+		var del = [];
+		var index;
+		
+		//Grabs the first connected node
+		for(var i = 0; i < GRAPH.nodes.length; i++) {
+			if(GRAPH.nodes[i].getDegree() != 0) {
+				start = GRAPH.nodes[i];
+			}
+		}
+		
+		//Grabs it's adjacent nodes
+		for(var i = 0; i < GRAPH.nodes.length; i++) {
+			if(matrix[start.getId()][GRAPH.nodes[i].getId()]) {
+				next.push(GRAPH.nodes[i]);
+			}
+		}
+		
+		notVisited.delete(start);
+		
+		//BFS
+		while(next.length > 0) {
+			
+			for(var i = 0; i < next.length; i++) {
+				notVisited.delete(next[i]);
+			}
+
+			for(var i = 0; i < next.length; i++) {
+				
+				for(var j = 0; j < GRAPH.nodes.length; j++) {
+					if(matrix[next[i].getId()][GRAPH.nodes[j].getId()] 
+					&& notVisited.has(GRAPH.nodes[j])
+					&& !add.includes(GRAPH.nodes[j])) {
+						add.push(GRAPH.nodes[j]);
+					}
+				}
+				
+				del.push(next[i]);
+			}
+
+			for(var i = 0; i < del.length; i++) {
+				index = next.indexOf(del[i]);
+				next.splice(index, 1);
+			}
+			
+			del = [];
+			
+			for(var i = 0; i < add.length; i++) {
+				next.push(add[i]);
+			}
+			
+			add = [];
+		}
+		
+		//Conncected nodes that have not been visited
+		notVisited.forEach(function(val){
+			if(val.getDegree() != 0) {
+				bool = false;
+			}
+		});
+		
+		return bool;		
+	}
+	
+	var enlistWebWorkers = function() {
+	
+		WEBWORKERMANAGER.enlistWebWorker(JSON.stringify({
+			type: "EP",
+			context: {
+				path: preSelectList,
+				matrix: matrixE,
+				GRAPH: GRAPH.toStringJ()
+			}
+		}));
+	}
+	
+	var createOrderTextBoxes = function(solution) {
+		var obj;
+		var orderPlane;
+		
+		for(var i = 0; i < solution.length; i++) {
+			orderPlane = UTILS.createLabel(i.toString(), ORDER_TEXT_COLOR);
+			obj = scene.getObjectById(solution[i]);
+			
+			orderPlane.position.set(obj.position.x, obj.position.y, LABEL_LAYER);
+			scene.add(orderPlane);
+			orderTexts.push(orderPlane);
+		}
+	}
+	
+	var addNewSolution = function(newSolution) {
+		clearPreselect();
+		
+		solutions.push(edgesToNodes(newSolution));
+		solutionsE[solutions.length - 1] = newSolution;
+		ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
+		
+		if(solutions.length == 1) {
+			animationSetUp();
+		}
+	}
+	
+	var edgesToNodes = function(edgeList) {
+		var nodeList = [];
+		var nodesForEdge1 = GRAPH.getNodesForEdge(edgeList[0]);
+		var nodesForEdge2 = GRAPH.getNodesForEdge(edgeList[1]);
+		
+		if(nodesForEdge1[0] === nodesForEdge2[0]) {
+			nodeList = [nodesForEdge1[1], nodesForEdge1[0], nodesForEdge2[1]];
+		}
+		else if(nodesForEdge1[0] === nodesForEdge2[1]) {
+			nodeList = [nodesForEdge1[1], nodesForEdge1[0], nodesForEdge2[0]];
+		}
+		else if(nodesForEdge1[1] === nodesForEdge2[0]) {
+			nodeList = [nodesForEdge1[0], nodesForEdge1[1], nodesForEdge2[1]];
+		}
+		else {
+			nodeList = [nodesForEdge1[0], nodesForEdge1[1], nodesForEdge2[0]];
+		}
+		
+		for(var i = 2; i < edgeList.length; i++) {
+			nodesForEdge1 = GRAPH.getNodesForEdge(edgeList[i]);
+			
+			if(nodeList[nodeList.length - 1] !== nodesForEdge1[0]) {
+				nodeList.push(nodesForEdge1[0]);
+			}
+			else {
+				nodeList.push(nodesForEdge1[1]);
+			}
+		}
+		
+		return nodeList;
+	}
+	
+	//Animation where the arrows are drawn out incrementally starting with the first edge to the last in the circuit
+	var animationSetUp = function() {
+		if(solutions.length === 0) {
+			return;
+		}
+		
+		ANIMATIONCONTROL.swapButtons(true);
+		
+		var circuit = [];
+		for(var i = 0; i < solutions[currSol].length; i++) {
+			circuit.push(solutions[currSol][i]);
+		}
+		
+		createOrderTextBoxes(solutionsE[currSol]);
+		
+		var iterationsPerEdge = ITERATIONS/(circuit.length - 1);
+		var endPoints = [];
+		var directionVectors = [];
+		var finalLengths = [];
+		
+		//Collects the endpoints for the arrows
+		for(var i = 0; i < circuit.length; i++) {
+			endPoints.push(scene.getObjectById(circuit[i]).position);
+		}
+		//Finds the required length of the arrows, and directions
+		for(var i = 0; i < endPoints.length - 1; i++) {
+			finalLengths.push(new THREE.Vector3(endPoints[i + 1].x - endPoints[i].x, endPoints[i + 1].y - endPoints[i].y, 0));
+			directionVectors.push(new THREE.Vector3(1,1,1));
+			directionVectors[i].copy(finalLengths[i]);
+			directionVectors[i].normalize();
+			finalLengths[i] = Math.sqrt(Math.pow(finalLengths[i].x, 2) + Math.pow(finalLengths[i].y, 2));
+		}
+		
+		iterationsPerEdge = Math.ceil(iterationsPerEdge);
+		actualIterations = iterationsPerEdge * directionVectors.length;//actual total iterations
+		
+		animationParameters[currSol] = {endPoints: endPoints,
+			directionVectors: directionVectors,
+			finalLengths: finalLengths};
+		
+		//Set up for animation
+		for(var i = 0; i < actualIterations; i++) {
+			
+			timeouts.push((function(i) {
+				setTimeout(function() {
+	
+				animation(endPoints[Math.floor(i/iterationsPerEdge)], 
+				directionVectors[Math.floor(i/iterationsPerEdge)], 
+				finalLengths[Math.floor(i/iterationsPerEdge)] * (i % iterationsPerEdge / iterationsPerEdge),
+				Math.floor(i/iterationsPerEdge));
+			
+				}, (i + 1)*TIME_BT_FRAMES);
+			})(i));
+		}
+		
+		timeouts.push(setTimeout(function() {
+			
+			animationComplete(endPoints, directionVectors, finalLengths);
+			
+		}, (actualIterations + 1)*TIME_BT_FRAMES ));
+	}
+	//Draws the arrows incrementally, and replaces an old arrow when appropriate
+	var animation = function(orig, dir, length, i) {
+		if(animationObjects[i] === undefined) {
+			animationObjects[i] = new THREE.ArrowHelper( dir, orig, length, ARROW_COLOR , HEAD_LENGTH, HEAD_LENGTH  )
+			scene.add( animationObjects[i] )
+		}
+		else {
+			scene.remove( animationObjects[i] );
+			animationObjects[i] = new THREE.ArrowHelper( dir, orig, length, ARROW_COLOR , HEAD_LENGTH, HEAD_LENGTH  )
+			scene.add( animationObjects[i] )
+		}
+	}
+	//Final visual
+	var animationComplete = function(endPoints, directionVectors, finalLengths) {
+		
+		for(var i = 0; i < directionVectors.length; i++) {
+			scene.remove( animationObjects[i] );
+			animationObjects[i] = new THREE.ArrowHelper( directionVectors[i], endPoints[i], finalLengths[i], ARROW_COLOR , HEAD_LENGTH, HEAD_LENGTH  );
+			scene.add( animationObjects[i] );
+		}
+		ANIMATIONCONTROL.swapButtons(false);
+	}
+	//Skip the animation
+	var skipAnimation = function() {
+		for(var i = 0; i < timeouts.length; i++) {
+			clearTimeout(timeouts[i]);
+		}
+		timeouts = [];
+		cleanUpAnimation();
+		
+		if(solutions.length !== 0) {
+			animationComplete(animationParameters[currSol].endPoints,
+			animationParameters[currSol].directionVectors,
+			animationParameters[currSol].finalLengths);
+		}
+	}
+	//Clear the animation
+	var cleanUpAnimation = function(){
+		clearPreselect();
+		for(var i = 0; i < animationObjects.length; i++) {
+			scene.remove(animationObjects[i]);
+		}
+		for(var i = 0; i < orderTexts.length; i++) {
+			scene.remove(orderTexts[i]);
+		}
+		animationObjects = [];
+		orderTexts = [];
+	}
+	var clearSolutions = function() {
+		currSol = 0;
+		solutions = [];
+	}
+	
+	var nextSolution = function() {
+		if(solutions.length === 0) {
+			return;
+		}
+		
+		cleanUpAnimation();
+		currSol = (currSol + 1)%solutions.length;
+		animationSetUp();
+		ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
+	}
+	var prevSolution = function() {
+		if(solutions.length === 0) {
+			return;
+		}
+		
+		cleanUpAnimation();
+		currSol = ((currSol - 1 >= 0)? currSol - 1 : solutions.length - 1)%solutions.length;
+		animationSetUp();
+		ANIMATIONCONTROL.updateCounter(currSol, solutions.length);
+	}
+	var replaySolution = function() {
+		if(solutions.length === 0) {
+			return;
+		}
+		
+		cleanUpAnimation();
+		animationSetUp();
+	}
+	
+	var preselect = function(id) {
+		var myLabel;
+		var obj;
+		var index;
+		var objToRemove;
+		
+		//Deconstruct the last part of the path
+		if(preSelectList.includes(id)) {
+			index = preSelectList.indexOf(id);
+			
+			for(var i = index; i <preSelectList.length;) {
+				preSelectList.splice(index, 1);
+			}
+			
+			for(var i = index; i < preSelectLabels.length; ) {
+				scene.remove(preSelectLabels[i]);
+				preSelectLabels.splice(i, 1);
+			}
+			
+			if(preSelectList.length === 0) {
+				preSelectNodeList = [];
+			}
+			else {
+				for(var i = preSelectList.length + 1; i < preSelectNodeList.length; ) {
+					preSelectNodeList.splice(i, 1);
+				}
+			}
+		}
+		else {
+			if(!validateSelection(id)) {
+				HINTBOX.setErrorMessage("The edge you selected is invalid.");
+				return;
+			}
+			
+			HINTBOX.setErrorMessage("");
+			
+			preSelectList.push(id);
+			
+			myLabel = UTILS.createLabel(preSelectList.length.toString(), PRESELECT_LABEL_COLOR);
+			obj = scene.getObjectById(id);
+			
+			myLabel.position.set(obj.position.x, obj.position.y, LABEL_LAYER);
+			
+			preSelectLabels.push(myLabel);
+			scene.add(myLabel);
+		}
+		
+		WEBWORKERMANAGER.restart();
+		ANIMATIONCONTROL.updateCounter();
+		clearSolutions();
+	}
+	
+	var clearPreselect = function() {
+		for(var i = 0; i < preSelectList.length; ) {
+			scene.remove(preSelectLabels[i]);
+			preSelectLabels.splice(i, 1);
+			preSelectList.splice(i, 1);
+		}
+	}
+	
+	var validateSelection = function(id) {
+		var nodesForEdge1 = null;
+		var nodesForEdge2 = null;
+		var targetNode = null;
+		
+		if(preSelectList.length === 0) {
+			nodesForEdge1 = GRAPH.getNodesForEdge(id);
+			preSelectNodeList = [nodesForEdge1[0], nodesForEdge1[1]];
+			return true;
+		}
+		if(preSelectList.length === 1) {
+			nodesForEdge1 = GRAPH.getNodesForEdge(preSelectList[0]);
+			nodesForEdge2 = GRAPH.getNodesForEdge(id);
+			
+			if(nodesForEdge1[0] === nodesForEdge2[0]
+			|| nodesForEdge1[0] === nodesForEdge2[1]
+			|| nodesForEdge1[1] === nodesForEdge2[0]
+			|| nodesForEdge1[1] === nodesForEdge2[1]) {
+				return true;
+			}
+			
+			return false;
+		}
+		
+		nodesForEdge1 = GRAPH.getNodesForEdge(preSelectList[preSelectList.length - 1]);
+		nodesForEdge2 = GRAPH.getNodesForEdge(preSelectList[preSelectList.length - 2]);
+		
+		if(nodesForEdge1[0] === nodesForEdge2[0] ||
+		nodesForEdge1[0] === nodesForEdge2[1]) {
+			targetNode = nodesForEdge1[1];
+		}
+		else {
+			targetNode = nodesForEdge1[0];
+		}
+		
+		nodesForEdge2 = GRAPH.getNodesForEdge(id);
+		
+		if(targetNode === nodesForEdge2[0]) {
+			preSelectNodeList.push(nodesForEdge2[1]);
+			return true;
+		}
+		if(targetNode === nodesForEdge2[1]) {
+			preSelectNodeList.push(nodesForEdge2[0]);
+			return true;
+		}
+		
+		return false;
+	}
+	
+	return {
+		solutions: solutions,
+		currSol: currSol,
+		
+		doing: doing,
+		main: main,
+		skipAnimation: skipAnimation,
+		cleanUpAnimation: cleanUpAnimation,
+		nextSolution: nextSolution,
+		prevSolution: prevSolution,
+		replaySolution: replaySolution,
+		addNewSolution: addNewSolution,
+		clearSolutions: clearSolutions,
+		preselect: preselect
+	}
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////                  End Eularian Path                                    //////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1436,7 +2173,7 @@ var hamiltonianCycle = function() {
 	}
 	
 	var checkNewSolution = function(circuit) {
-		clearPreselect()
+		clearPreselect();
 		
 		for(var i = 0; i < solutions.length; i++) {
 			if(rotateSolutionCheck(circuit, solutions[i])) {
@@ -2653,6 +3390,11 @@ var Graph = function() {
 			return edge;
 		}
 		
+		var getNodesForEdge = function(eId) {
+			var e = findEdgeObject(eId);
+			return [e.getNode1(), e.getNode2()];	
+		}
+		
 		//Finds all edges for a node. Required object id.
 		var findEdges = function(n, both=false) {
 			var edgesFound = [];
@@ -2706,6 +3448,7 @@ var Graph = function() {
 			removeName: removeName,
 			findNode: findNode,
 			findEdge: findEdge,
+			getNodesForEdge: getNodesForEdge,
 			findEdges: findEdges,
 			findEdgeObject: findEdgeObject,
 			toStringJ: toStringJ
@@ -2942,14 +3685,14 @@ var graphDrawer = function() {
 
 var graphParser = function() {
 	//Force Bassed Generation
-	const K = 40;
-	const REPULSION = 20;
+	const K = 50;
+	const REPULSION = 10;
 	const DAMP = 0.2;
-	const MAXSPEED = 40;
+	const MAXSPEED = 30;
 	const M = 50;
-	const LENGTH = 50;
-	const TIMESTEP = 0.01;
-	const ENERGYMIN = 10;
+	const LENGTH = 60;
+	const TIMESTEP = 0.0001;
+	const ENERGYMIN = 1;
 	const CENTERATTRACTION = 50;//Ignore the name, the higher, the weaker
 	//Initializing
 	const DISTANCEFROMCENTER = 200;
@@ -3085,7 +3828,7 @@ var graphParser = function() {
 		
 		//Create a node and edge set
 		errorMsg = havel_hakiniAlgorithm(degArray);
-		if(typeof msg == "string") {
+		if(typeof errorMsg == "string") {
 			HINTBOX.setErrorMessage(errorMsg);
 			return;
 		}
@@ -3113,7 +3856,7 @@ var graphParser = function() {
 			}
 		}
 		if(sum%2 == 1) {
-			return "This is not a real graph, the sum of all degrees for real graphs is even.";
+			return "This is not a real graph, the sum of all degrees for real graphs has to be even.";
 		}
 		
 		//Sorts in non-increasing order
@@ -3146,6 +3889,10 @@ var graphParser = function() {
 			for(var i = 1; i <= nodeSet[0].degReq; i++) {
 				edgeSet.push([nodeSet[0].id, nodeSet[i].id]);
 				nodeSet[i].degReq--;
+				
+				if(nodeSet[i].degReq < 0) {
+					return "The degree requirements cannot be met, this is not a real graph.";
+				}
 			}
 			nodeSet[0].degReq = 0;
 			
@@ -3185,7 +3932,7 @@ var graphParser = function() {
 			for(var i = 0; i < points.length; i++) {
 				GRAPHDRAWER.repositionEdges(scene.getObjectById(points[i].id));
 			}
-			console.log(calculateEnergy(points));			
+			//console.log(calculateEnergy(points));			
 		} while(calculateEnergy(points) > ENERGYMIN);
 	}
 	
@@ -3394,6 +4141,7 @@ var GRAPHPARSER = graphParser();
 var COMPLEMENT = complement();
 var EDGECONTRACTION = edgeContraction();
 var EULERIANCYCLE = eulerianCycle();
+var EULERIANPATH = eulerianPath();
 var HAMILTONIANCYCLE = hamiltonianCycle();
 var HAMILTONIANPATH = hamiltonianPath();
 var GRAPHCOLOR = graphColor();
@@ -3493,6 +4241,7 @@ $(document).ready(function(){
 		e
 	});
 	$("#save-file").click(function() {
+		changeImage();
 		$('#SaveModal').show();
 	});
 	$("#save-File-Set").click(function() {
@@ -3603,7 +4352,9 @@ $(document).ready(function(){
 			renameNode(event.pageX, (event.pageY - $(this).offset().top));
 		}
 		else if(mode == "hamiltonianPathMode"
-		|| mode === "hamiltonianCycleMode") {
+		|| mode === "hamiltonianCycleMode"
+		|| mode === "eulerianCycleMode"
+		|| mode === "eulerianPathMode") {
 			selectionList();
 		}
 	});
@@ -3744,6 +4495,9 @@ function init() {
 	if(sessionStorage.getItem('graph')) {
 		load(sessionStorage.getItem('graph'));
 	}
+	
+	//Sets size of image in modal
+	$("#Modal-Image").attr('style', "width:" + $("#renderer").height()*.9 +"px;height:" + $("#renderer").height()/$("#renderer").width()*500 + "px;");
 }
 
 //Loading a Graph in
@@ -3781,7 +4535,11 @@ function autoSave() {
 	sessionStorage.setItem('graph', GRAPH.toStringJ());
 }
 
-	
+//Change the image on the modal
+function changeImage() {
+	var imgData = renderer.domElement.toDataURL("image/jpeg");
+	$("#Modal-Image").attr('src', imgData);
+}	
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////                ~Actions~                                                              /////////////////////////////////////////////////////////
 /////////////////////////// Anything that involves checking what the user has selected for an action goes here.   /////////////////////////////////////////////////////////
@@ -3897,8 +4655,16 @@ function selectionList() {
 		if(mode === "hamiltonianPathMode") {
 			HAMILTONIANPATH.preselect(INTERSECTED.id);
 		}
-		if(mode === "hamiltonianCycleMode") {
+		else if(mode === "hamiltonianCycleMode") {
 			HAMILTONIANCYCLE.preselect(INTERSECTED.id);
+		}
+	}
+	else if(INTERSECTED !== null && INTERSECTED.userData == "Edge") {
+		if(mode === "eulerianCycleMode") {
+			EULERIANCYCLE.preselect(INTERSECTED.id);
+		}
+		else if(mode === "eulerianPathMode") {
+			EULERIANPATH.preselect(INTERSECTED.id);
 		}
 	}
 }
@@ -3914,6 +4680,7 @@ function submitSetMode() {
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
 	ANIMATIONCONTROL.hideButtons();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.hideColorPicker();
 	ANIMATIONCONTROL.hidePreSelectButton();
 	mode = "submitSetMode";
@@ -3924,6 +4691,7 @@ function submitSeqMode() {
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
 	ANIMATIONCONTROL.hideButtons();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.hideColorPicker();
 	ANIMATIONCONTROL.hidePreSelectButton();
 	mode = "submitSeqMode";
@@ -3935,6 +4703,7 @@ function drawNodeMode() {
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
 	ANIMATIONCONTROL.hideButtons();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.hideColorPicker();
 	ANIMATIONCONTROL.hidePreSelectButton();
 	mode = "drawNode";
@@ -3947,6 +4716,7 @@ function drawEdgeMode() {
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
 	ANIMATIONCONTROL.hideButtons();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.hideColorPicker();
 	ANIMATIONCONTROL.hidePreSelectButton();
 	mode = "drawEdge";
@@ -3957,6 +4727,7 @@ function deleteNodeMode() {
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.hideButtons();
 	ANIMATIONCONTROL.hideColorPicker();
 	ANIMATIONCONTROL.hidePreSelectButton();
@@ -3968,6 +4739,7 @@ function deleteEdgeMode() {
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.hideButtons();
 	ANIMATIONCONTROL.hideColorPicker();
 	ANIMATIONCONTROL.hidePreSelectButton();
@@ -3978,6 +4750,7 @@ function moveNodeMode() {
 	resetSelection();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.hideButtons();
 	ANIMATIONCONTROL.hideColorPicker();
 	ANIMATIONCONTROL.hidePreSelectButton();
@@ -3991,6 +4764,7 @@ function renameNodeMode() {
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.hideButtons();
 	ANIMATIONCONTROL.hideColorPicker();
 	ANIMATIONCONTROL.hidePreSelectButton();
@@ -4002,6 +4776,7 @@ function clearGraphAct() {
 	ANIMATIONCONTROL.skipAnimation();
 	GRAPHDRAWER.clearGraph();
 	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.hideButtons();
 	ANIMATIONCONTROL.hideColorPicker();
 	ANIMATIONCONTROL.hidePreSelectButton();
@@ -4013,6 +4788,7 @@ function edgeContractionMode() {
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.hideButtons();
 	ANIMATIONCONTROL.hideColorPicker();
 	ANIMATIONCONTROL.hidePreSelectButton();
@@ -4023,6 +4799,7 @@ function complementAct() {
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.hideButtons();
 	ANIMATIONCONTROL.hideColorPicker();
 	ANIMATIONCONTROL.hidePreSelectButton();
@@ -4039,12 +4816,28 @@ function eulerianCycleMode() {
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.showButtons();
 	ANIMATIONCONTROL.swapButtons();
 	ANIMATIONCONTROL.hideColorPicker();
-	ANIMATIONCONTROL.hidePreSelectButton();
+	ANIMATIONCONTROL.showPreSelectButton();
 	mode = "eulerianCycleMode";
-	EULERIANCYCLE.main();
+}
+function eulerianPathMode() {
+	HINTBOX.setModeMessage("If you would like to narrow the search area, you can partially preselect your own path.<br>" +
+		"Click on the nodes in the order you would like them to be in path.<br/>" +
+		"Click on an already selected node to remove it from the path.</br>" +
+		"When you are ready, click GO, and we will try to build upon the path you have, if you put in any.");
+	resetSelection();
+	cleanUp();
+	ANIMATIONCONTROL.skipAnimation();
+	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.updateCounter();
+	ANIMATIONCONTROL.showButtons();
+	ANIMATIONCONTROL.swapButtons();
+	ANIMATIONCONTROL.hideColorPicker();
+	ANIMATIONCONTROL.showPreSelectButton();
+	mode = "eulerianPathMode";
 }
 function hamiltonianCycleMode() {
 	HINTBOX.setModeMessage("If you would like to narrow the search area, you can partially preselect your own path.<br>" +
@@ -4056,6 +4849,7 @@ function hamiltonianCycleMode() {
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.showButtons();
 	ANIMATIONCONTROL.swapButtons();
 	ANIMATIONCONTROL.hideColorPicker();
@@ -4071,6 +4865,7 @@ function hamiltonianPathMode() {
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.showButtons();
 	ANIMATIONCONTROL.swapButtons();
 	ANIMATIONCONTROL.hideColorPicker();
@@ -4086,13 +4881,14 @@ function graphColorMode() {
 	cleanUp();
 	ANIMATIONCONTROL.skipAnimation();
 	ANIMATIONCONTROL.cleanUpAnimation();
+	ANIMATIONCONTROL.updateCounter();
 	ANIMATIONCONTROL.showButtons();
 	ANIMATIONCONTROL.swapButtons();
 	ANIMATIONCONTROL.showColorPicker();
 	ANIMATIONCONTROL.hidePreSelectButton();
 	mode = "graphColorMode";
 }
-	
+
 //Resets selections
 function resetSelection() {
 	if(SELECTED1 !== null) {
