@@ -3685,14 +3685,14 @@ var graphDrawer = function() {
 
 var graphParser = function() {
 	//Force Bassed Generation
-	const K = 40;
-	const REPULSION = 20;
+	const K = 50;
+	const REPULSION = 10;
 	const DAMP = 0.2;
-	const MAXSPEED = 40;
+	const MAXSPEED = 30;
 	const M = 50;
-	const LENGTH = 50;
-	const TIMESTEP = 0.01;
-	const ENERGYMIN = 10;
+	const LENGTH = 60;
+	const TIMESTEP = 0.0001;
+	const ENERGYMIN = 1;
 	const CENTERATTRACTION = 50;//Ignore the name, the higher, the weaker
 	//Initializing
 	const DISTANCEFROMCENTER = 200;
@@ -3828,7 +3828,7 @@ var graphParser = function() {
 		
 		//Create a node and edge set
 		errorMsg = havel_hakiniAlgorithm(degArray);
-		if(typeof msg == "string") {
+		if(typeof errorMsg == "string") {
 			HINTBOX.setErrorMessage(errorMsg);
 			return;
 		}
@@ -3856,7 +3856,7 @@ var graphParser = function() {
 			}
 		}
 		if(sum%2 == 1) {
-			return "This is not a real graph, the sum of all degrees for real graphs is even.";
+			return "This is not a real graph, the sum of all degrees for real graphs has to be even.";
 		}
 		
 		//Sorts in non-increasing order
@@ -3889,6 +3889,10 @@ var graphParser = function() {
 			for(var i = 1; i <= nodeSet[0].degReq; i++) {
 				edgeSet.push([nodeSet[0].id, nodeSet[i].id]);
 				nodeSet[i].degReq--;
+				
+				if(nodeSet[i].degReq < 0) {
+					return "The degree requirements cannot be met, this is not a real graph.";
+				}
 			}
 			nodeSet[0].degReq = 0;
 			
@@ -3928,7 +3932,7 @@ var graphParser = function() {
 			for(var i = 0; i < points.length; i++) {
 				GRAPHDRAWER.repositionEdges(scene.getObjectById(points[i].id));
 			}
-			console.log(calculateEnergy(points));			
+			//console.log(calculateEnergy(points));			
 		} while(calculateEnergy(points) > ENERGYMIN);
 	}
 	
