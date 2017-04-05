@@ -4241,6 +4241,7 @@ $(document).ready(function(){
 		e
 	});
 	$("#save-file").click(function() {
+		changeImage();
 		$('#SaveModal').show();
 	});
 	$("#save-File-Set").click(function() {
@@ -4494,6 +4495,9 @@ function init() {
 	if(sessionStorage.getItem('graph')) {
 		load(sessionStorage.getItem('graph'));
 	}
+	
+	//Sets size of image in modal
+	$("#Modal-Image").attr('style', "width:" + $("#renderer").height()*.9 +"px;height:" + $("#renderer").height()/$("#renderer").width()*500 + "px;");
 }
 
 //Loading a Graph in
@@ -4531,7 +4535,11 @@ function autoSave() {
 	sessionStorage.setItem('graph', GRAPH.toStringJ());
 }
 
-	
+//Change the image on the modal
+function changeImage() {
+	var imgData = renderer.domElement.toDataURL("image/jpeg");
+	$("#Modal-Image").attr('src', imgData);
+}	
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////                ~Actions~                                                              /////////////////////////////////////////////////////////
 /////////////////////////// Anything that involves checking what the user has selected for an action goes here.   /////////////////////////////////////////////////////////

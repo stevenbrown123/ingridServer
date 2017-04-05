@@ -144,6 +144,9 @@
 				margin: -5px 0 0 15px;
 				pointer-events:none;
 			}
+			#Modal-Image {
+				float: right;
+			}
 		</style>
 		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
 		<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
@@ -263,6 +266,7 @@
 				</div>
 				<div class="modal-body">
 					<form class="form" id="Save-Form">
+						<img src="" alt="Graph Image" style="width:304px;height:228px;" id="Modal-Image">
 						File Type: <br>
 						<div class="radio">
 							<input type="radio" name="FileType" id="PDF" value="PDF"checked>PDF<br>
@@ -273,9 +277,11 @@
 						<div class="radio">
 							<input type="radio" name="FileType" id="JPG" value="JPG">JPG<br>
 						</div>
-						Save file as:
-						<input type="text" class="form-control" name="Filename" id="Filename" value="graph.pdf"><br>
-						<button type="button" class="btn btn-default" id="save-File-Set">Save</button>
+						<div style="clear:both;">
+							Save file as:
+							<input type="text" class="form-control" name="Filename" id="Filename" value="graph.pdf"><br>
+							<button type="button" class="btn btn-default" id="save-File-Set">Save</button>
+						</div>
 					</form>
 				</div>
 			</div>
