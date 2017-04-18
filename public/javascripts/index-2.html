@@ -534,17 +534,32 @@
 					backUpContext = obj.context;
 					backUpContext = unwrap(backUpContext);
 					
+					console.log(backUpContext.GRAPH.edges);
+					console.log(backUpContext.matrix);
+					
 					currentContext = copyEPContext(backUpContext);
 					
 					if(backUpContext.path.length === 0) {
 						for(var i = 0; i < backUpContext.GRAPH.edges.length; i++) {
 							if(firstOpportunity == false) {
 								currentContext.path.push(backUpContext.GRAPH.edges[i].id);
+								currentContext.lastNode = backUpContext.GRAPH.edges[i].node1;
 								firstOpportunity = true;
+								
+								newContext = copyEPContext(backUpContext);
+								newContext.path.push(backUpContext.GRAPH.edges[i].id);
+								newContext.lastNode = backUpContext.GRAPH.edges[i].node2;
+								self.postMessage(EPReport(wrap(newContext), "Incomplete"));
 							}
 							else {
 								newContext = copyEPContext(backUpContext);
 								newContext.path.push(backUpContext.GRAPH.edges[i].id);
+								newContext.lastNode = backUpContext.GRAPH.edges[i].node1;
+								self.postMessage(EPReport(wrap(newContext), "Incomplete"));
+								
+								newContext = copyEPContext(backUpContext);
+								newContext.path.push(backUpContext.GRAPH.edges[i].id);
+								newContext.lastNode = backUpContext.GRAPH.edges[i].node2;
 								self.postMessage(EPReport(wrap(newContext), "Incomplete"));
 							}
 						}
@@ -559,16 +574,34 @@
 						for(var i = 0; i < backUpContext.GRAPH.edges.length; i++) {
 						
 							if(backUpContext.matrix[backUpContext.path[backUpContext.path.length - 1]][backUpContext.GRAPH.edges[i].id]
-							&& !backUpContext.path.includes(backUpContext.GRAPH.edges[i].id)) {
+							&& !backUpContext.path.includes(backUpContext.GRAPH.edges[i].id)
+							&& (backUpContext.lastNode === backUpContext.GRAPH.edges[i].node1 
+							|| backUpContext.lastNode === backUpContext.GRAPH.edges[i].node2)) {
 								potential = true;
 							
 								if(firstOpportunity === false) {
 									currentContext.path.push(backUpContext.GRAPH.edges[i].id);
+									
+									if(backUpContext.lastNode === backUpContext.GRAPH.edges[i].node1) {
+										currentContext.lastNode = backUpContext.GRAPH.edges[i].node2;
+									}
+									else {
+										currentContext.lastNode = backUpContext.GRAPH.edges[i].node1;
+									}
+									
 									firstOpportunity = true;
 								}
 								else {
 									newContext = copyEPContext(backUpContext);
 									newContext.path.push(backUpContext.GRAPH.edges[i].id);
+									
+									if(backUpContext.lastNode === backUpContext.GRAPH.edges[i].node1) {
+										newContext.lastNode = backUpContext.GRAPH.edges[i].node2;
+									}
+									else {
+										newContext.lastNode = backUpContext.GRAPH.edges[i].node1;
+									}
+									
 									self.postMessage(EPReport(wrap(newContext), "Incomplete"));
 								}
 							}
@@ -582,7 +615,6 @@
 					
 					if(backUpContext.path.length === backUpContext.GRAPH.edges.length) {
 						self.postMessage(EPReport(wrap(backUpContext), "Complete"));
-						console.log(backUpContext);
 					}
 				}
 				//Hamiltonian Cycle
@@ -766,7 +798,8 @@
 				return {
 					path: obj.path.slice(),
 					matrix: obj.matrix,
-					GRAPH: obj.GRAPH
+					GRAPH: obj.GRAPH,
+					lastNode: obj.lastNode
 				};
 			}
 			

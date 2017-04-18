@@ -1743,13 +1743,38 @@ var eulerianPath = function() {
 	}
 	
 	var enlistWebWorkers = function() {
+		
+		var lastNode;
+		var nodeList;
+		
+		if(preSelectList.length === 0) {
+			lastNode = null;
+		}
+		else if(preSelectList.length === 1) {
+			lastNode = GRAPH.findEdgeObject(preSelectList[0]).getNode1();
+			
+			WEBWORKERMANAGER.enlistWebWorker(JSON.stringify({
+				type: "EP",
+				context: {
+					path: preSelectList,
+					matrix: matrixE,
+					GRAPH: GRAPH.toStringJ(),
+					lastNode: GRAPH.findEdgeObject(preSelectList[0]).getNode2()
+				}
+			}));
+		}
+		else {
+			nodeList = edgesTonodes(preSelectList);
+			lastNode = nodeList[nodeList.length - 1];
+		}
 	
 		WEBWORKERMANAGER.enlistWebWorker(JSON.stringify({
 			type: "EP",
 			context: {
 				path: preSelectList,
 				matrix: matrixE,
-				GRAPH: GRAPH.toStringJ()
+				GRAPH: GRAPH.toStringJ(),
+				lastNode: lastNode
 			}
 		}));
 	}
